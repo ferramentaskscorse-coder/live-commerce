@@ -224,7 +224,7 @@
         <div style="overflow-x:auto;">
           <table>
             <thead><tr>
-              <th style="width:12%;">ID</th><th style="width:14%;">Produto</th><th style="width:12%;">Cor</th><th style="width:7%;">Tam.</th><th style="width:5%;">Estq.</th>
+              <th style="width:12%;">ID</th><th style="width:13%;">Produto</th><th style="width:11%;">Cor</th><th style="width:9%;">Tam.</th><th style="width:5%;">Estq.</th>
               <th style="width:9%;">Custo</th><th style="width:9%;">Venda</th><th style="width:9%;">Embalagem</th>
               <th style="width:8%;">Disponível</th><th style="width:7%;">Margem</th><th style="width:4%;"></th>
             </tr></thead>
@@ -232,7 +232,8 @@
           </table>
         </div>
         <div class="btn-row" style="justify-content:flex-end;margin-top:10px;">
-          <button class="btn btn-ghost" onclick="if(confirm('Apagar todos os produtos?')){produtos=[];salvar();renderProdutos();updateStats();}">🗑️ Limpar todos</button>
+          <button class="btn btn-ghost" onclick="exportarProdutos()">⬇ Exportar produtos</button>
+        <button class="btn btn-ghost" onclick="if(confirm('Apagar todos os produtos?')){produtos=[];salvar();renderProdutos();updateStats();}">🗑️ Limpar todos</button>
         </div>
       </div>
     </div>
@@ -1548,6 +1549,45 @@ document.addEventListener('click', e=>{
   const overlay = document.getElementById('modal-overlay');
   if(e.target === overlay) fecharModal();
 });
+
+// EXPORTAR PRODUTOS
+function exportarProdutos(){
+  if(!produtos.length){ toast('Nenhum produto para exportar.'); return; }
+
+  const doExport = () => {
+    const dados = [
+      ['ID','Nome','Cor','Tamanho','Estoque','Custo (R$)','Venda (R$)','Embalagem (R$)','Margem (%)','Disponível']
+    ];
+    [...produtos].sort((a,b)=>a.id.localeCompare(b.id,'pt',{numeric:true})).forEach(p=>{
+      const margem = p.venda>0 ? (((p.venda-p.custo-p.embalagem)/p.venda)*100).toFixed(1) : 0;
+      dados.push([
+        p.id, p.nome, p.cor||'', p.tam||'',
+        p.estoque||0, p.custo||0, p.venda||0, p.embalagem||0,
+        margem+'%',
+        p.ativo===false?'Não':'Sim'
+      ]);
+    });
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(dados);
+    ws['!cols'] = [{wch:14},{wch:22},{wch:10},{wch:10},{wch:9},{wch:12},{wch:12},{wch:14},{wch:10},{wch:10}];
+    XLSX.utils.book_append_sheet(wb, ws, 'Produtos');
+
+    const agora = new Date();
+    const ts = `${agora.getDate().toString().padStart(2,'0')}${(agora.getMonth()+1).toString().padStart(2,'0')}${agora.getFullYear()}`;
+    XLSX.writeFile(wb, `produtos_${ts}.xlsx`);
+    toast('Produtos exportados!');
+  };
+
+  if(window.XLSX){ doExport(); }
+  else{
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    s.onload = doExport;
+    s.onerror = () => toast('Erro ao carregar biblioteca.');
+    document.head.appendChild(s);
+  }
+}
 
 // EXPORTAR EXCEL
 function exportarExcel(){
