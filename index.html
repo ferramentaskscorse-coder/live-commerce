@@ -1670,7 +1670,12 @@ function extrairProdutoDeTexto(texto){
     .replace(/\bcentavos\b/gi,' ')
     .replace(/\bcor\b/gi,' ');
 
-  if(corVal) nomeClean = nomeClean.replace(new RegExp('(?:^|\\s)'+corVal+'(?:\\s|$)','gi'),' ');
+  if(corVal){
+    try{
+      const corEsc = corVal.replace(/[.*+?^${}()|\[\]\\]/g,'\\$&');
+      nomeClean = nomeClean.replace(new RegExp('(?:^|[\\s,])'+corEsc+'(?:[\\s,\\.]|$)','gi'),' ');
+    }catch(e){}
+  }
   if(tamVal && tamVal.length<=3) nomeClean = nomeClean.replace(new RegExp('(?<![a-z])'+tamVal+'(?![a-z])','gi'),' ');
 
   nomeClean = nomeClean
