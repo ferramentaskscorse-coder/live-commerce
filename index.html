@@ -341,10 +341,10 @@ pedro - 2x calça jeans G
         <div style="overflow-x:auto;">
           <table>
             <thead><tr>
-              <th style="width:4%;">#</th><th style="width:17%;">Cliente</th><th style="width:12%;">ID produto</th>
-              <th style="width:22%;">Produto</th><th style="width:8%;">Qtd</th>
-              <th style="width:13%;">Valor unit.</th><th style="width:13%;">Subtotal</th>
-              <th style="width:7%;">Status</th><th style="width:4%;"></th>
+              <th style="width:4%;">#</th><th style="width:13%;">Cliente</th><th style="width:10%;">ID produto</th>
+              <th style="width:18%;">Produto</th><th style="width:6%;">Qtd</th>
+              <th style="width:10%;">Valor unit.</th><th style="width:10%;">Subtotal</th>
+              <th style="width:10%;">Data pedido</th><th style="width:7%;">Status</th><th style="width:4%;"></th>
             </tr></thead>
             <tbody id="venda-body"><tr><td colspan="9" class="empty">Nenhuma venda ainda.</td></tr></tbody>
           </table>
@@ -737,8 +737,8 @@ function processarComentarios(){
       if(score>melhorScore){melhorScore=score;prodVinculado=p;}
     });
 
-    // só vincula se tiver match razoável (score >= 2)
-    if(melhorScore<2) prodVinculado=null;
+    // só vincula se tiver match real de nome (score >= 4)
+    if(melhorScore<4) prodVinculado=null;
 
     const idproduto=prodVinculado?prodVinculado.id:null;
     const nomeProd=prodVinculado?prodVinculado.nome:extrairProduto(linha);
@@ -751,7 +751,7 @@ function processarComentarios(){
     const estoqueInsuf = estoqueAtual !== null && estoqueAtual < qtd;
     const estoquePos   = estoqueAtual !== null ? estoqueAtual - qtd : null;
 
-    vendas.push({cliente,idproduto,produto:nomeProd,qtd,valorVenda,subtotal,status:'Em separação',obs:''});
+    vendas.push({cliente,idproduto,produto:nomeProd,qtd,valorVenda,subtotal,status:'Em separação',dataPedido:new Date().toISOString().split('T')[0],obs:''});
     if(prodVinculado){
       prodVinculado.estoque = Math.max(0,(prodVinculado.estoque||0)-qtd);
       const estoqueRestante = prodVinculado.estoque;
@@ -810,6 +810,7 @@ function renderVendas(){
     <td style="color:var(--muted);">${i+1}</td><td>${v.cliente}</td>
     <td><span class="tag">${v.idproduto||'—'}</span></td><td>${v.produto}</td><td>${v.qtd}</td>
     <td>${fmt(v.valorVenda)}</td><td style="font-weight:600;">${fmt(v.subtotal)}</td>
+    <td style="font-size:11px;color:var(--muted);">${v.dataPedido||'—'}</td>
     <td><span class="pill pill-sep">Em sep.</span></td>
     <td><button class="btn btn-danger" onclick="removeVenda(${i})">✕</button></td>
   </tr>`).join('');
@@ -1932,11 +1933,18 @@ function extrairPedidoDeTexto(texto){
   let melhorScore = 0;
   produtos.filter(p=>p.ativo!==false).forEach(p=>{
     let score = 0;
-    if(linhaLow.includes(p.id.toLowerCase())) score+=10;
-    const palavras = p.nome.toLowerCase().split(/\s+/).filter(w=>w.length>2);
-    palavras.forEach(w=>{ if(linhaLow.includes(w)) score+=2; });
-    if(p.cor && linhaLow.includes(p.cor.toLowerCase())) score+=3;
-    if(p.tam && linhaLow.includes(p.tam.toLowerCase())) score+=3;
+    if(linhaLow.includes(p.id.toLowerCase())) score+=20;
+    // Palavras do nome — peso maior, mínimo 3 chars
+    const palavras = p.nome.toLowerCase().split(/\s+/).filter(w=>w.length>3);
+    const totalPalavras = palavras.length || 1;
+    let matchPalavras = 0;
+    palavras.forEach(w=>{ if(linhaLow.includes(w)) matchPalavras++; });
+    score += (matchPalavras / totalPalavras) * 10; // proporcional ao nome
+    // Cor e tamanho só somam se houver match de nome também
+    if(matchPalavras > 0){
+      if(p.cor && linhaLow.includes(p.cor.toLowerCase())) score+=2;
+      if(p.tam && linhaLow.match(new RegExp('(?:^|\\s)'+p.tam.toLowerCase()+'(?:\\s|$)'))) score+=2;
+    }
     if(score>melhorScore){ melhorScore=score; prodVinculado=p; }
   });
 
@@ -1953,6 +1961,7 @@ function extrairPedidoDeTexto(texto){
     qtd,
     valorVenda: prodVinculado?.venda || null,
     subtotal: prodVinculado ? qtd * prodVinculado.venda : null,
+    dataPedido: new Date().toISOString().split('T')[0],
     obs
   };
 }
@@ -1985,7 +1994,7 @@ function renderTabelaValidacaoPedido(pedidos){
     <table class="val-table">
       <thead><tr>
         <th>Cliente</th><th>Produto vinculado</th><th>Cor</th><th>Tam.</th>
-        <th>Qtd</th><th>Valor unit.</th><th>Obs</th><th></th>
+        <th>Qtd</th><th>Valor unit.</th><th>Data pedido</th><th>Obs</th><th></th>
       </tr></thead>
       <tbody>
         ${pedidos.map((p,i)=>{
@@ -2011,6 +2020,7 @@ function renderTabelaValidacaoPedido(pedidos){
             <td><input value="${p.tam||''}" style="width:50px;" onchange="atualizarPedidoVal(${i},'tam',this.value)" /></td>
             <td><input type="number" value="${p.qtd||1}" style="width:55px;" onchange="atualizarPedidoVal(${i},'qtd',this.value)" /></td>
             <td style="font-size:12px;color:var(--accent);">${p.valorVenda?'R$ '+p.valorVenda.toFixed(2).replace('.',','):'a combinar'}</td>
+            <td><input type="date" value="${p.dataPedido||new Date().toISOString().split('T')[0]}" onchange="atualizarPedidoVal(${i},'dataPedido',this.value)" style="width:130px;" /></td>
             <td><input value="${p.obs||''}" placeholder="opcional" onchange="atualizarPedidoVal(${i},'obs',this.value)" /></td>
             <td><button class="btn btn-danger" onclick="removerLinhaPedidoVal(${i})">✕</button></td>
           </tr>`;
@@ -2069,6 +2079,7 @@ function confirmarValidacaoPedido(){
       valorVenda,
       subtotal: valorVenda ? qtd * valorVenda : null,
       status: 'Em separação',
+      dataPedido: p.dataPedido || new Date().toISOString().split('T')[0],
       obs: p.obs || ''
     });
     ok++;
