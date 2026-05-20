@@ -98,12 +98,12 @@
   .btn-danger:hover{background:var(--red-bg);}
   .btn-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
   table{width:100%;border-collapse:collapse;font-size:12px;}
-  th{text-align:left;padding:8px 9px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);font-size:11px;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;}
-  td{padding:9px 9px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;word-break:break-word;}
+  th{text-align:left;padding:8px 9px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);font-size:11px;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;position:sticky;top:0;background:var(--surface);z-index:1;}
+  td{padding:7px 8px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;word-break:break-word;}
   tr:last-child td{border-bottom:none;}
   tr:hover td{background:rgba(255,255,255,.02);}
   .total-row td{background:var(--surface2);font-weight:600;}
-  .tag{display:inline-block;background:var(--surface2);border:1px solid var(--border2);border-radius:4px;padding:1px 6px;font-size:11px;color:var(--muted);font-family:var(--mono);}
+  .tag{display:inline-block;background:var(--surface2);border:1px solid var(--border2);border-radius:4px;padding:1px 6px;font-size:11px;color:var(--muted);font-family:var(--mono);white-space:nowrap;}
   .pill{display:inline-flex;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;}
   .pill-sep{background:rgba(250,174,0,.12);color:#faae00;}
   .pill-frete{background:rgba(96,165,250,.12);color:var(--blue);}
@@ -261,13 +261,21 @@
         <div id="upload-result" class="upload-result"></div>
       </div>
       <div class="card">
-        <div class="card-title">Tabela de produtos <span class="card-title-right" id="prod-count"></span></div>
+        <div class="card-title">
+          Tabela de produtos <span class="card-title-right" id="prod-count"></span>
+          <select id="prod-sort" style="font-size:12px;padding:5px 10px;border-radius:var(--radius);background:var(--surface2);border:1px solid var(--border2);color:var(--text);" onchange="renderProdutos()">
+            <option value="data-desc">Mais recentes</option>
+            <option value="data-asc">Mais antigos</option>
+            <option value="id">Por ID</option>
+            <option value="nome">Por nome</option>
+          </select>
+        </div>
         <div style="overflow-x:auto;overflow-y:auto;max-height:600px;">
           <table>
             <thead><tr>
-              <th style="width:12%;">ID</th><th style="min-width:130px;">Produto</th><th style="min-width:90px;">Cor</th><th style="min-width:85px;">Tamanho</th><th style="min-width:55px;">Estq.</th>
-              <th style="min-width:90px;">Custo</th><th style="min-width:90px;">Venda</th><th style="min-width:90px;">Embalagem</th>
-              <th style="min-width:80px;">Disponível</th><th style="min-width:70px;">Margem</th><th style="min-width:40px;"></th>
+              <th style="width:12%;">ID</th><th style="min-width:120px;">Produto</th><th style="min-width:80px;">Cor</th><th style="min-width:75px;">Tamanho</th><th style="min-width:50px;">Estq.</th>
+              <th style="min-width:85px;">Custo</th><th style="min-width:85px;">Venda</th><th style="min-width:85px;">Embalagem</th>
+              <th style="min-width:75px;">Disponível</th><th style="min-width:65px;">Margem</th><th style="min-width:85px;">Cadastro</th><th style="min-width:40px;"></th>
             </tr></thead>
             <tbody id="prod-body"><tr><td colspan="8" class="empty">Nenhum produto cadastrado.</td></tr></tbody>
           </table>
@@ -560,7 +568,8 @@ function addProduto(){
   const tam=document.getElementById('p-tam').value.trim();
   const n=x=>parseFloat(document.getElementById(x).value)||0;
   const ativo=document.getElementById('p-ativo').value==='1';
-  produtos.push({id,nome,cor,tam,estoque:n('p-estoque'),custo:n('p-custo'),venda:n('p-venda'),embalagem:n('p-embalagem'),ativo});
+  const dataCadastro = new Date().toLocaleDateString('pt-BR');
+  produtos.push({id,nome,cor,tam,estoque:n('p-estoque'),custo:n('p-custo'),venda:n('p-venda'),embalagem:n('p-embalagem'),ativo,dataCadastro});
   salvar(); renderProdutos(); updateStats(); limparFormProduto(); toast('Produto adicionado!');
 }
 function removeProduto(id){ produtos=produtos.filter(p=>p.id!==id); salvar(); renderProdutos(); updateStats(); }
@@ -569,7 +578,14 @@ function limparFormProduto(){ ['p-id','p-nome','p-estoque','p-custo','p-venda','
 function renderProdutos(){
   const tbody=document.getElementById('prod-body');
   if(!produtos.length){tbody.innerHTML='<tr><td colspan="8" class="empty">Nenhum produto cadastrado.</td></tr>';return;}
-  const produtosOrdenados=[...produtos].sort((a,b)=>a.id.localeCompare(b.id,'pt',{numeric:true}));
+  const sortVal = document.getElementById('prod-sort')?.value || 'data-desc';
+  const produtosOrdenados=[...produtos].sort((a,b)=>{
+    if(sortVal==='id')        return a.id.localeCompare(b.id,'pt',{numeric:true});
+    if(sortVal==='nome')      return a.nome.localeCompare(b.nome,'pt');
+    if(sortVal==='data-asc')  return (a.dataCadastro||'').localeCompare(b.dataCadastro||'');
+    // data-desc: mais recentes primeiro (padrão)
+    return (b.dataCadastro||'').localeCompare(a.dataCadastro||'');
+  });
   tbody.innerHTML=produtosOrdenados.map(p=>{
     const margem=p.venda>0?(((p.venda-p.custo-p.embalagem)/p.venda)*100).toFixed(0)+'%':'—';
     const cor=parseFloat(margem)>=0?'var(--green)':'var(--red)';
@@ -580,6 +596,7 @@ function renderProdutos(){
       <td>${fmt(p.embalagem)}</td>
       <td>${ativoHtml}</td>
       <td style="color:${cor};font-weight:600;">${margem}</td>
+      <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${p.dataCadastro||'—'}</td>
       <td style="white-space:nowrap;">
         <button class="btn btn-ghost" onclick="abrirModal('${p.id}')" style="padding:4px 9px;font-size:12px;margin-right:4px;">✏️</button>
         <button class="btn btn-danger" onclick="removeProduto('${p.id}')">✕</button>
@@ -644,7 +661,7 @@ function processarLinhas(rows,result){
     const n=v=>{ if(!map[v])return 0; const x=parseFloat(String(row[map[v]]||'0').replace(',','.')); return isNaN(x)?0:x; };
     const corVal=map['cor']?String(row[map['cor']]||'').trim():'';
     const tamVal=map['tam']?String(row[map['tam']]||'').trim():'';
-    produtos.push({id,nome,cor:corVal,tam:tamVal,estoque:n('estoque'),custo:n('custo'),venda:n('venda'),embalagem:n('embalagem'),ativo:true});
+    produtos.push({id,nome,cor:corVal,tam:tamVal,estoque:n('estoque'),custo:n('custo'),venda:n('venda'),embalagem:n('embalagem'),ativo:true,dataCadastro:new Date().toLocaleDateString('pt-BR')});
     ok++;
   });
   salvar(); renderProdutos(); updateStats();
@@ -1174,14 +1191,22 @@ function iniciarMic(){
     box.textContent = '🎙️ Ouvindo...';
   };
 
+  let ultimoFinal = '';
   recognition.onresult = (e) => {
     let final = '', interim = '';
     for(let i=0; i<e.results.length; i++){
-      if(e.results[i].isFinal) final += e.results[i][0].transcript + ' ';
-      else interim += e.results[i][0].transcript;
+      if(e.results[i].isFinal){
+        final += e.results[i][0].transcript + ' ';
+      } else {
+        interim += e.results[i][0].transcript;
+      }
     }
-    transcricaoAcumulada = final;
-    box.textContent = '🎙️ ' + (final + interim).trim();
+    // Acumula finais sem perder o que já foi dito
+    if(final && final !== ultimoFinal){
+      transcricaoAcumulada = final;
+      ultimoFinal = final;
+    }
+    box.textContent = '🎙️ ' + (transcricaoAcumulada + interim).trim();
   };
 
   recognition.onerror = (e) => {
@@ -1447,7 +1472,7 @@ function confirmarValidacao(){
     if(!nome || nome.length < 2) return;
     if(produtos.find(x=>x.id===id)){ dup++; return; }
 
-    produtos.push({ id: id||'SEM-ID', nome, cor, tam, estoque, custo, venda, embalagem, ativo: true });
+    produtos.push({ id: id||'SEM-ID', nome, cor, tam, estoque, custo, venda, embalagem, ativo: true, dataCadastro: new Date().toLocaleDateString('pt-BR') });
     ok++;
   });
 
@@ -1524,21 +1549,25 @@ function interpretarAudio(texto){
 }
 
 function extrairProdutoDeTexto(texto){
-  // Limpa expressões de controle que não são dados
+  // Limpa expressões de controle
   texto = texto
     .replace(/mesma\s+cor[es]?/gi,' ')
     .replace(/mesma\s+pe[çc]a/gi,' ')
     .replace(/mesmo\s+produto/gi,' ')
     .replace(/o\s+mesmo/gi,' ')
-    .replace(/tamanho\s+e\s+estoque/gi,'tamanho_e_estoque') // preserva temporariamente
+    .replace(/tamanho\s+e\s+estoque/gi,'tamanho_e_estoque')
     .replace(/cor\s+e\s+estoque/gi,'estoque')
     .replace(/cor\s+e\b/gi,' ')
     .replace(/\be\s+(?=estoque|tamanho|cor\b)/gi,' ')
-    .replace(/tamanho_e_estoque/gi,'tamanho e estoque'); // restaura
+    .replace(/tamanho_e_estoque/gi,'tamanho e estoque');
+
+  // Normaliza vírgula decimal antes de converter por extenso
+  // Ex: "249,90" → "249.90", "329,90" → "329.90"
+  texto = texto.replace(/(\d+),(\d{1,2})(?=\s|$)/g, '$1.$2');
 
   // Normaliza números por extenso
   let t = texto.toLowerCase()
-    .replace(/\bum\b/g,'1').replace(/\bdois\b/g,'2').replace(/\btrês\b/g,'3')
+    .replace(/\bum\b/g,'1').replace(/\bdois\b/g,'2').replace(/\btrês|tres\b/g,'3')
     .replace(/\bquatro\b/g,'4').replace(/\bcinco\b/g,'5').replace(/\bseis\b/g,'6')
     .replace(/\bsete\b/g,'7').replace(/\boito\b/g,'8').replace(/\bnove\b/g,'9')
     .replace(/\bdez\b/g,'10').replace(/\bonze\b/g,'11').replace(/\bdoze\b/g,'12')
@@ -1547,49 +1576,67 @@ function extrairProdutoDeTexto(texto){
     .replace(/\bsetenta\b/g,'70').replace(/\boitenta\b/g,'80').replace(/\bnoventa\b/g,'90')
     .replace(/\bcem\b/g,'100').replace(/\bcento\b/g,'100').replace(/\bduzentos?\b/g,'200')
     .replace(/\btrezentos?\b/g,'300').replace(/\bquatrocentos?\b/g,'400').replace(/\bquinhentos?\b/g,'500')
-    .replace(/(\d+)\s*e\s*(\d{1,2})(?!\d)/g, (_,a,b) => (parseInt(a)+parseInt(b)).toString())
-    .replace(/(\d+)\s+(?:reais\s+e\s+)?(\d{1,2})\s*(?:centavos?)?(?=\s|$)/g, '$1.$2');
+    // "249 e 90" → "249.90", "329 e 90" → "329.90"
+    .replace(/(\d+)\s*e\s*(\d{1,2})(?!\d)/g, (_,a,b) => {
+      // "249 e 90" → "249.90" (centavos), "40 e 9" → "49" (dezenas)
+      const bNum = parseInt(b);
+      const aNum = parseInt(a);
+      if(aNum >= 100 && bNum < 100) return aNum + '.' + b.padStart(2,'0');
+      if(bNum < 10 && aNum % 10 === 0) return (aNum + bNum).toString();
+      return a + '.' + b;
+    })
+    // "249 reais e 90 centavos" → "249.90"
+    .replace(/(\d+)\s+(?:reais?\s+e\s+)?(\d{1,2})\s*(?:centavos?)?(?=\s|$)/g, '$1.$2');
 
-  const toNum = v => { const n=parseFloat(String(v).replace(',','.')); return isNaN(n)?0:n; };
-  const numRe = '(?:r\\$\\s*)?(\\d+(?:[.,]\\d{1,2})?)';
+  const toNum = v => {
+    const n = parseFloat(String(v).replace(',','.'));
+    return isNaN(n) ? 0 : n;
+  };
 
-  // CUSTO — aceita várias formas incluindo "compra r$ X", "compra X"
-  const custoMatch = t.match(new RegExp(
-    '(?:custo|comprei|paguei|custou|valor\\s+(?:de\\s+|da\\s+)?compra|pre[çc]o\\s+(?:de\\s+)?compra|\\bcompra)(?:\\s*(?:de|por|é|:|r\\$))?\\s*'+numRe,'i'
-  ));
+  // CUSTO — aceita "compra X", "custo X", "valor compra X", "comprei X"
+  const custoMatch = t.match(
+    /(?:valor\s+(?:de\s+|da\s+)?compra|pre[çc]o\s+(?:de\s+)?compra|\bcompra|custo|comprei|paguei|custou)(?:\s*(?:de|por|é|:|r\$))?\s*(\d+(?:[\.,]\d{1,2})?)/i
+  );
 
-  // VENDA — aceita "venda r$ X", "valor venda X", "vendo X"
-  const vendaMatch = t.match(new RegExp(
-    '(?:vendo?|valor\\s+(?:de\\s+|da\\s+)?venda|pre[çc]o\\s+(?:de\\s+)?venda|\\bvenda)(?:\\s*(?:por|a|é|de|:|r\\$))?\\s*'+numRe,'i'
-  ));
+  // VENDA — aceita "venda X", "valor venda X", "vendo X"
+  const vendaMatch = t.match(
+    /(?:valor\s+(?:de\s+|da\s+)?venda|pre[çc]o\s+(?:de\s+)?venda|\bvenda|vendo?)(?:\s*(?:por|a|é|de|:|r\$))?\s*(\d+(?:[\.,]\d{1,2})?)/i
+  );
 
-  const embMatch     = t.match(new RegExp('(?:embalagem|embal|sacola|caixa|envelope|emb)(?:\\s*(?:de|:))?\\s*'+numRe,'i'));
-  // Extrai estoque — aceita "estoque 5", "e estoque 5", "tamanho X estoque Y"
-  const estoqueMatch = t.match(/(?:e\s+)?(?:estoque|tenho|quantidade)(?:\s*de|\s*é)?\s*(\d+)|\b(\d+)\s*(?:pe[çc]as?|unidades?|no\s*estoque)\b/i);
-  const idMatch      = t.match(/(?:código|codigo|id|referência|referencia|ref)\s*[:\-]?\s*([a-z0-9\-_]+)/i);
+  const embMatch = t.match(
+    /(?:embalagem|embal|sacola|caixa|envelope|emb)(?:\s*(?:de|:))?\s*(?:r\$\s*)?(\d+(?:[\.,]\d{1,2})?)/i
+  );
+
+  const estoqueMatch = t.match(
+    /(?:e\s+)?(?:estoque|tenho|quantidade)(?:\s*de)?\s*(\d+)|\b(\d+)\s*(?:pe[çc]as?|unidades?|no\s*estoque)\b/i
+  );
+
+  const idMatch = t.match(
+    /(?:código|codigo|id|referência|referencia|ref)\s*[:\-]?\s*([a-z0-9\-_]+)/i
+  );
 
   // COR
   const cores = [
     'rosa','azul','vermelho[a]?','verde','amarelo[a]?','branco[a]?','preto[a]?',
     'cinza','bege','laranja','roxo[a]?','marrom','vinho','nude','caramelo',
-    'off[\\-\\s]white','off white','branca','preta','vermelha',
-    'bord[oô]|bordo|bordô','terracota','terra','mostarda','salmão|salmão|salmao',
-    'lilás|lilas','cobre','dourado[a]?','prata','branco\s+off','cru','menta',
-    'turquesa','coral','chocolate','café|cafe','areia','palha'
+    'off[\-\s]white','off white','branca','preta','vermelha',
+    'bord[oô]|bordo|bordô','terracota','mostarda','salmão|salmao',
+    'lilás|lilas','cobre','dourado[a]?','prata','menta','turquesa',
+    'coral','chocolate','café|cafe','areia','palha'
   ];
   let corVal = '';
   for(const c of cores){
-    // Usa (?:^|\s) ao invés de \b para lidar com caracteres especiais como ô, ã
-    const m = t.match(new RegExp('(?:^|[\\s,])('+ c +')(?:[\\s,.]|$)','i'));
-    if(m){ corVal = (m[1]||m[2]||'').trim(); if(corVal) break; }
+    const m = t.match(new RegExp('(?:^|[\s,])('+c+')(?:[\s,.]|$)','i'));
+    if(m){ corVal = (m[1]||'').trim(); if(corVal) break; }
   }
 
-  // TAMANHO — só depois de remover cor e valores
-  const tamMatch = t.match(/\btamanho\s*(pp|p|m|g{1,2}|xg|xxg|único|unico|u)\b|\b(pp|gg|xg|xxg|único|unico)\b|(?<![a-záàãâéêíóôõúç])(p|m|g)(?![a-záàãâéêíóôõúç])/i);
-  const tamVal   = tamMatch ? (tamMatch[1]||tamMatch[2]||tamMatch[3]||'').toUpperCase() : '';
+  // TAMANHO
+  const tamMatch = t.match(
+    /\btamanho\s*(pp|p|m|g{1,2}|xg|xxg|único|unico|u)\b|\b(pp|gg|xg|xxg|único|unico)\b|(?<![a-záàãâéêíóôõúç])(p|m|g)(?![a-záàãâéêíóôõúç])/i
+  );
+  const tamVal = tamMatch ? (tamMatch[1]||tamMatch[2]||tamMatch[3]||'').toUpperCase() : '';
 
-  // NOME: remove todos os tokens de contexto
-  // Remove palavras de contexto do nome — ordem importa
+  // NOME — remove todos os tokens de contexto
   let nomeClean = texto
     .replace(/valor\s+(?:de\s+|da\s+)?compra[^,\.;\n]*/gi,' ')
     .replace(/valor\s+(?:de\s+|da\s+)?venda[^,\.;\n]*/gi,' ')
@@ -1612,16 +1659,20 @@ function extrairProdutoDeTexto(texto){
     .replace(/\breais\b/gi,' ')
     .replace(/\bcentavos\b/gi,' ')
     .replace(/\bcor\b/gi,' ');
-  if(corVal) nomeClean = nomeClean.replace(new RegExp('\\b'+corVal+'\\b','gi'),' ');
+
+  if(corVal) nomeClean = nomeClean.replace(new RegExp('(?:^|\\s)'+corVal+'(?:\\s|$)','gi'),' ');
   if(tamVal && tamVal.length<=3) nomeClean = nomeClean.replace(new RegExp('(?<![a-z])'+tamVal+'(?![a-z])','gi'),' ');
+
   nomeClean = nomeClean
-    .replace(/r\$\s*\d+[.,]?\d*/gi,' ')
-    .replace(/\d+[.,]?\d*/g,' ')
-    .replace(/[,;.!?:]+/g,' ')
+    .replace(/r\$\s*\d+[\.,]?\d*/gi,' ')
+    .replace(/\d+[\.,]\d*/g,' ')
+    .replace(/\b\d+\b/g,' ')
+    .replace(/[,;\.!\?:]+/g,' ')
     .replace(/\s+/g,' ').trim();
+
   nomeClean = nomeClean.split(' ')
-    .filter(w=>w.length>1)
-    .map(w=>w.charAt(0).toUpperCase()+w.slice(1).toLowerCase())
+    .filter(w => w.length > 1)
+    .map(w => w.charAt(0).toUpperCase()+w.slice(1).toLowerCase())
     .join(' ');
 
   return {
@@ -1754,14 +1805,21 @@ function iniciarMicPedido(){
     box.textContent = '🎙️ Ouvindo...';
   };
 
+  let ultimoFinalPedido = '';
   recognitionPedido.onresult = (e) => {
     let final = '', interim = '';
     for(let i=0; i<e.results.length; i++){
-      if(e.results[i].isFinal) final += e.results[i][0].transcript + ' ';
-      else interim += e.results[i][0].transcript;
+      if(e.results[i].isFinal){
+        final += e.results[i][0].transcript + ' ';
+      } else {
+        interim += e.results[i][0].transcript;
+      }
     }
-    transcricaoPedidoAcumulada = final;
-    box.textContent = '🎙️ ' + (final + interim).trim();
+    if(final && final !== ultimoFinalPedido){
+      transcricaoPedidoAcumulada = final;
+      ultimoFinalPedido = final;
+    }
+    box.textContent = '🎙️ ' + (transcricaoPedidoAcumulada + interim).trim();
   };
 
   recognitionPedido.onerror = (e) => {
