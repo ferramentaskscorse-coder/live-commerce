@@ -32,14 +32,20 @@
     .nav-item{flex-direction:column;gap:3px;padding:8px 10px;font-size:10px;min-width:60px;border-radius:0;margin:0;border:none;text-align:center;flex:1;}
     .nav-icon{font-size:20px;width:auto;}
     .sidebar-stats{display:none;}
-    .main{order:1;padding-bottom:70px;}
-    .page{padding:16px;}
+    .main{order:1;padding-bottom:80px;}
+    .page{padding:12px;}
     .stats{grid-template-columns:repeat(2,minmax(0,1fr));}
     .fin-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
     .form-grid.g4{grid-template-columns:repeat(2,minmax(0,1fr));}
     .form-grid.g3{grid-template-columns:repeat(1,minmax(0,1fr));}
     .frete-row{grid-template-columns:repeat(2,minmax(0,1fr));}
     .evolucao{grid-template-columns:repeat(2,1fr);}
+    .card{padding:14px 14px;}
+    table{font-size:11px;white-space:nowrap;}
+    th,td{padding:7px 8px;}
+    .btn{font-size:12px;padding:7px 12px;}
+    .page-title{font-size:18px;}
+    input[type=text],input[type=number],textarea,select{font-size:14px;}
   }
   .logo{padding:0 20px 22px;border-bottom:1px solid var(--border);margin-bottom:14px;}
   .logo-badge{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#0f0f0f;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;letter-spacing:.08em;margin-bottom:8px;}
@@ -91,7 +97,7 @@
   .btn-danger{background:transparent;color:var(--red);border-color:rgba(255,107,107,.3);font-size:12px;padding:4px 9px;}
   .btn-danger:hover{background:var(--red-bg);}
   .btn-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
-  table{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;}
+  table{width:100%;border-collapse:collapse;font-size:12px;}
   th{text-align:left;padding:8px 9px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);font-size:11px;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;}
   td{padding:9px 9px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;word-break:break-word;}
   tr:last-child td{border-bottom:none;}
@@ -256,12 +262,12 @@
       </div>
       <div class="card">
         <div class="card-title">Tabela de produtos <span class="card-title-right" id="prod-count"></span></div>
-        <div style="overflow-x:auto;">
+        <div style="overflow-x:auto;overflow-y:auto;max-height:600px;">
           <table>
             <thead><tr>
-              <th style="width:12%;">ID</th><th style="width:12%;">Produto</th><th style="width:10%;">Cor</th><th style="width:11%;">Tamanho</th><th style="width:5%;">Estq.</th>
-              <th style="width:9%;">Custo</th><th style="width:9%;">Venda</th><th style="width:9%;">Embalagem</th>
-              <th style="width:8%;">Disponível</th><th style="width:7%;">Margem</th><th style="width:4%;"></th>
+              <th style="width:12%;">ID</th><th style="min-width:130px;">Produto</th><th style="min-width:90px;">Cor</th><th style="min-width:85px;">Tamanho</th><th style="min-width:55px;">Estq.</th>
+              <th style="min-width:90px;">Custo</th><th style="min-width:90px;">Venda</th><th style="min-width:90px;">Embalagem</th>
+              <th style="min-width:80px;">Disponível</th><th style="min-width:70px;">Margem</th><th style="min-width:40px;"></th>
             </tr></thead>
             <tbody id="prod-body"><tr><td colspan="8" class="empty">Nenhum produto cadastrado.</td></tr></tbody>
           </table>
