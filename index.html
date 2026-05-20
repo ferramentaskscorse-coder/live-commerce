@@ -2,7 +2,14 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#c8f04a" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Live Commerce" />
+<meta name="description" content="Gestão de vendas para lives no Instagram" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icon-192.png" />
 <title>Live Commerce — Gestão de Vendas</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <style>
@@ -17,6 +24,23 @@
   body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;}
   .shell{display:flex;min-height:100vh;}
   .sidebar{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);padding:24px 0;display:flex;flex-direction:column;}
+  @media(max-width:700px){
+    .shell{flex-direction:column;}
+    .sidebar{width:100%;border-right:none;border-top:1px solid var(--border);border-bottom:none;padding:0;order:2;position:fixed;bottom:0;left:0;right:0;z-index:50;background:var(--surface);}
+    .logo{display:none;}
+    .nav{display:flex;flex-direction:row;padding:0;overflow-x:auto;}
+    .nav-item{flex-direction:column;gap:3px;padding:8px 10px;font-size:10px;min-width:60px;border-radius:0;margin:0;border:none;text-align:center;flex:1;}
+    .nav-icon{font-size:20px;width:auto;}
+    .sidebar-stats{display:none;}
+    .main{order:1;padding-bottom:70px;}
+    .page{padding:16px;}
+    .stats{grid-template-columns:repeat(2,minmax(0,1fr));}
+    .fin-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+    .form-grid.g4{grid-template-columns:repeat(2,minmax(0,1fr));}
+    .form-grid.g3{grid-template-columns:repeat(1,minmax(0,1fr));}
+    .frete-row{grid-template-columns:repeat(2,minmax(0,1fr));}
+    .evolucao{grid-template-columns:repeat(2,1fr);}
+  }
   .logo{padding:0 20px 22px;border-bottom:1px solid var(--border);margin-bottom:14px;}
   .logo-badge{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#0f0f0f;font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;letter-spacing:.08em;margin-bottom:8px;}
   .logo-dot{width:5px;height:5px;background:#0f0f0f;border-radius:50%;animation:blink 1s infinite;}
@@ -142,6 +166,16 @@
   .log-item.venda{background:var(--green-bg);border:1px solid rgba(77,222,154,.15);}
   .log-item.ignorado{background:var(--surface2);border:1px solid var(--border);opacity:.6;}
   .log-comment{font-size:12px;color:var(--muted);margin-bottom:2px;}
+  .alerta-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center;animation:fadeIn .2s;}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  .alerta-box{background:var(--surface);border-radius:var(--radius-lg);padding:28px 32px;max-width:400px;width:90%;text-align:center;border:2px solid var(--red);animation:popIn .25s;}
+  .alerta-box.amarelo{border-color:#faae00;}
+  @keyframes popIn{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
+  .alerta-icon{font-size:44px;margin-bottom:12px;}
+  .alerta-titulo{font-size:18px;font-weight:700;color:var(--text);margin-bottom:8px;}
+  .alerta-msg{font-size:14px;color:var(--muted);line-height:1.6;margin-bottom:20px;}
+  .alerta-produto{font-size:15px;font-weight:600;color:var(--red);margin-bottom:4px;}
+  .alerta-produto.amarelo{color:#faae00;}
   #modal-overlay.aberto{display:flex!important;}
 </style>
 </head>
@@ -158,6 +192,7 @@
       <div class="nav-item" onclick="setPage('live')"><span class="nav-icon">💬</span> Pedido</div>
       <div class="nav-item" onclick="setPage('poslive')"><span class="nav-icon">📬</span> Pós-live <span class="nav-badge" id="badge-frete" style="display:none;">0</span></div>
       <div class="nav-item" onclick="setPage('vendas')"><span class="nav-icon">🛍️</span> Vendas <span class="nav-badge" id="badge-vendas" style="display:none;">0</span></div>
+      <div class="nav-item" onclick="setPage('estoque')"><span class="nav-icon">📦</span> Estoque <span class="nav-badge" id="badge-estoque" style="display:none;">0</span></div>
       <div class="nav-item" onclick="setPage('relatorio')"><span class="nav-icon">📊</span> Relatório</div>
     </nav>
     <div class="sidebar-stats">
@@ -259,6 +294,16 @@ pedro - 2x calça jeans G
         </div>
         <div class="hint">Cole vários comentários de uma vez. O agente separa vendas de dúvidas e curiosidades automaticamente.</div>
       </div>
+      <div class="card">
+        <div class="card-title">🎙️ Registrar pedido por áudio</div>
+        <div class="btn-row">
+          <button class="mic-btn" id="mic-pedido-btn" onclick="toggleMicPedido()">🎙️ Falar pedido</button>
+          <span style="font-size:12px;color:var(--muted);">Fale um ou vários pedidos. Separe com "próximo". Clique em parar quando terminar.</span>
+        </div>
+        <div class="mic-transcricao" id="mic-pedido-transcricao" style="display:none;"></div>
+        <div id="mic-pedido-validacao" style="display:none;margin-top:12px;"></div>
+        <div class="hint" style="margin-top:10px;">Exemplo: <i>"Ana Lima, blusa floral rosa P, 2 unidades. Próximo. João Silva, calça jeans azul G, 1 unidade."</i></div>
+      </div>
       <div id="log-area"></div>
     </div>
 
@@ -306,6 +351,50 @@ pedro - 2x calça jeans G
         <div class="stat"><div class="stat-label">Total frete arrecadado</div><div class="stat-value green" id="pl-total-frete">R$ 0,00</div></div>
       </div>
       <div id="clientes-area"><div class="empty">Nenhuma venda registrada ainda. Processe comentários na aba Live.</div></div>
+    </div>
+
+    <!-- ESTOQUE -->
+    <div id="page-estoque" class="page">
+      <div class="page-header">
+        <div class="page-title">Estoque</div>
+        <div class="page-sub">Visão atual do estoque por produto. Para ajustar, edite o produto diretamente.</div>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="stat-label">Produtos ativos</div><div class="stat-value accent" id="est-ativos">0</div></div>
+        <div class="stat"><div class="stat-label">Total em estoque</div><div class="stat-value" id="est-total">0</div></div>
+        <div class="stat"><div class="stat-label">Produtos zerados</div><div class="stat-value red" id="est-zerados">0</div></div>
+        <div class="stat"><div class="stat-label">Produtos críticos (≤3)</div><div class="stat-value" id="est-criticos" style="color:#faae00;">0</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">
+          Estoque atual
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="est-filtro" placeholder="Filtrar por nome, cor ou ID..." style="width:220px;font-size:12px;padding:5px 10px;" oninput="renderEstoque()" />
+            <select id="est-ordem" style="font-size:12px;padding:5px 10px;width:160px;" onchange="renderEstoque()">
+              <option value="id">Ordenar por ID</option>
+              <option value="nome">Ordenar por nome</option>
+              <option value="estoque-asc">Menor estoque</option>
+              <option value="estoque-desc">Maior estoque</option>
+            </select>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead><tr>
+              <th style="width:13%;">ID</th>
+              <th style="width:20%;">Produto</th>
+              <th style="width:10%;">Cor</th>
+              <th style="width:9%;">Tamanho</th>
+              <th style="width:10%;">Estoque</th>
+              <th style="width:10%;">Vendidos</th>
+              <th style="width:10%;">Situação</th>
+              <th style="width:10%;">Disponível</th>
+              <th style="width:8%;"></th>
+            </tr></thead>
+            <tbody id="est-body"><tr><td colspan="9" class="empty">Nenhum produto cadastrado.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <!-- RELATÓRIO -->
@@ -404,12 +493,13 @@ function fmt(v){ return v==null?'—':'R$ '+Number(v).toFixed(2).replace('.',','
 function fmtN(v){ return Number(v).toFixed(2).replace('.',','); }
 
 function setPage(p){
-  const ids=['produtos','live','poslive','vendas','relatorio'];
+  const ids=['produtos','live','poslive','vendas','estoque','relatorio'];
   ids.forEach(id=>{ document.getElementById('page-'+id).classList.toggle('active',id===p); });
   document.querySelectorAll('.nav-item').forEach((el,i)=>el.classList.toggle('active',ids[i]===p));
   if(p==='relatorio') renderRelatorio();
   if(p==='vendas') renderVendas();
   if(p==='poslive') renderPosLive();
+  if(p==='estoque') renderEstoque();
 }
 
 // CLIENTES agrupados por nome
@@ -435,6 +525,7 @@ function updateStats(){
   document.getElementById('ss-bruto').textContent=fmt(bruto);
   document.getElementById('ss-liq').textContent=fmt(liq);
   const bv=document.getElementById('badge-vendas'); bv.textContent=vendas.length; bv.style.display=vendas.length?'':'none';
+  if(document.getElementById('est-body')) renderEstoque();
   const pendentes=clientes.filter(c=>{ const f=fretes[c.cliente.toLowerCase()]; return !f||!f.frete; }).length;
   const bf=document.getElementById('badge-frete'); bf.textContent=pendentes; bf.style.display=pendentes?'':'none';
   document.getElementById('prod-count').textContent=produtos.length+' produto'+(produtos.length!==1?'s':'');
@@ -621,11 +712,39 @@ function processarComentarios(){
     const valorVenda=prodVinculado?prodVinculado.venda:null;
     const subtotal=valorVenda?qtd*valorVenda:null;
 
+    // Verifica e desconta estoque
+    const estoqueAtual = prodVinculado ? (prodVinculado.estoque||0) : null;
+    const estoqueZero  = estoqueAtual !== null && estoqueAtual === 0;
+    const estoqueInsuf = estoqueAtual !== null && estoqueAtual < qtd;
+    const estoquePos   = estoqueAtual !== null ? estoqueAtual - qtd : null;
+
     vendas.push({cliente,idproduto,produto:nomeProd,qtd,valorVenda,subtotal,status:'Em separação',obs:''});
+    if(prodVinculado){
+      prodVinculado.estoque = Math.max(0,(prodVinculado.estoque||0)-qtd);
+      const estoqueRestante = prodVinculado.estoque;
+      if(estoqueRestante === 0) setTimeout(()=>alertaEstoqueUrgente(prodVinculado.nome,'zerado'),300);
+      else if(estoqueRestante === 1) setTimeout(()=>alertaEstoqueUrgente(prodVinculado.nome,'ultimo'),300);
+    }
     novas++;
 
     const vinculo=idproduto?`<span class="tag">${idproduto}</span>`:`<span style="color:var(--red);font-size:11px;">⚠ não vinculado</span>`;
-    return `<div class="log-item venda"><span>✓</span><div><div style="font-weight:600;">${cliente} ${vinculo}</div><div class="log-comment">${nomeProd} × ${qtd}${valorVenda?' — '+fmt(subtotal):' — valor a combinar'}</div></div></div>`;
+    const alertaEst = estoqueZero
+      ? `<div style="font-size:11px;color:var(--red);margin-top:2px;">🚨 ESTOQUE ESGOTADO ao registrar este pedido!</div>`
+      : estoqueInsuf
+      ? `<div style="font-size:11px;color:#faae00;margin-top:2px;">⚠ Estoque insuficiente — tinha ${estoqueAtual} un., pedido foi de ${qtd}</div>`
+      : estoquePos !== null && estoquePos === 0
+      ? `<div style="font-size:11px;color:var(--red);margin-top:2px;">🚨 Estoque zerado após este pedido!</div>`
+      : estoquePos !== null && estoquePos <= 3
+      ? `<div style="font-size:11px;color:#faae00;margin-top:2px;">⚠ Atenção: restam apenas ${estoquePos} un. em estoque</div>`
+      : '';
+    return `<div class="log-item venda" style="${estoqueZero||estoqueInsuf?'border-left:3px solid var(--red);':estoquePos!==null&&estoquePos<=3?'border-left:3px solid #faae00;':''}">
+      <span>✓</span>
+      <div>
+        <div style="font-weight:600;">${cliente} ${vinculo}</div>
+        <div class="log-comment">${nomeProd} × ${qtd}${valorVenda?' — '+fmt(subtotal):' — valor a combinar'}</div>
+        ${alertaEst}
+      </div>
+    </div>`;
   }).join('');
 
   salvar(); updateStats(); renderVendas();
@@ -965,6 +1084,50 @@ function copiarRelatorio(){
 }
 
 function renderTudo(){ renderProdutos(); renderVendas(); renderPosLive(); updateStats(); }
+
+// ALERTA URGENTE DE ESTOQUE
+function alertaEstoqueUrgente(produto, tipo){
+  // Remove alerta anterior se houver
+  const anterior = document.getElementById('alerta-estoque-overlay');
+  if(anterior) anterior.remove();
+
+  const isZerado = tipo === 'zerado';
+  const overlay = document.createElement('div');
+  overlay.className = 'alerta-overlay';
+  overlay.id = 'alerta-estoque-overlay';
+  overlay.innerHTML = `
+    <div class="alerta-box ${isZerado?'':'amarelo'}">
+      <div class="alerta-icon">${isZerado?'🚨':'⚠️'}</div>
+      <div class="alerta-titulo">${isZerado?'ESTOQUE ESGOTADO!':'ÚLTIMO ITEM!'}</div>
+      <div class="alerta-produto ${isZerado?'':'amarelo'}">${produto}</div>
+      <div class="alerta-msg">${isZerado
+        ? 'Este produto acabou de zerar o estoque.<br>Não aceite mais pedidos deste item!'
+        : 'Resta apenas <strong>1 unidade</strong> em estoque.<br>Avise na live antes de aceitar mais pedidos!'
+      }</div>
+      <button class="btn btn-accent" onclick="document.getElementById('alerta-estoque-overlay').remove()" style="width:100%;justify-content:center;font-size:15px;padding:12px;">
+        Entendido
+      </button>
+    </div>`;
+
+  // Fecha clicando fora
+  overlay.addEventListener('click', e => {
+    if(e.target === overlay) overlay.remove();
+  });
+
+  document.body.appendChild(overlay);
+
+  // Toca som de alerta se disponível
+  try{
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = isZerado ? 880 : 660;
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+    osc.start(); osc.stop(ctx.currentTime + 0.8);
+  }catch(e){}
+}
 
 // MICROFONE — reconhecimento de voz para cadastro de produto
 let recognition = null;
@@ -1550,6 +1713,385 @@ document.addEventListener('click', e=>{
   if(e.target === overlay) fecharModal();
 });
 
+// MICROFONE PEDIDOS
+let recognitionPedido = null;
+let gravandoPedido = false;
+let transcricaoPedidoAcumulada = '';
+
+function toggleMicPedido(){
+  if(!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)){
+    toast('Use o Chrome para reconhecimento de voz.');
+    return;
+  }
+  if(gravandoPedido){ pararMicPedidoFinal(); return; }
+  iniciarMicPedido();
+}
+
+function iniciarMicPedido(){
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognitionPedido = new SpeechRecognition();
+  recognitionPedido.lang = 'pt-BR';
+  try{ Object.defineProperty(recognitionPedido,'lang',{get:()=>'pt-BR',set:()=>{}}); }catch(e){}
+  recognitionPedido.continuous = true;
+  recognitionPedido.interimResults = true;
+  recognitionPedido.maxAlternatives = 1;
+
+  const btn = document.getElementById('mic-pedido-btn');
+  const box = document.getElementById('mic-pedido-transcricao');
+  transcricaoPedidoAcumulada = '';
+
+  recognitionPedido.onstart = () => {
+    gravandoPedido = true;
+    btn.innerHTML = '⏹ Parar e revisar';
+    btn.classList.add('gravando');
+    box.style.display = 'block';
+    box.textContent = '🎙️ Ouvindo...';
+  };
+
+  recognitionPedido.onresult = (e) => {
+    let final = '', interim = '';
+    for(let i=0; i<e.results.length; i++){
+      if(e.results[i].isFinal) final += e.results[i][0].transcript + ' ';
+      else interim += e.results[i][0].transcript;
+    }
+    transcricaoPedidoAcumulada = final;
+    box.textContent = '🎙️ ' + (final + interim).trim();
+  };
+
+  recognitionPedido.onerror = (e) => {
+    if(e.error==='not-allowed'){ pararMicPedido(); toast('Permita o acesso ao microfone.'); }
+    else if(e.error!=='no-speech') console.warn('mic pedido:', e.error);
+  };
+
+  recognitionPedido.onend = () => {
+    if(gravandoPedido){ try{ recognitionPedido.start(); }catch(e){} }
+  };
+
+  recognitionPedido.start();
+}
+
+function pararMicPedidoFinal(){
+  gravandoPedido = false;
+  if(recognitionPedido){ try{ recognitionPedido.stop(); }catch(e){} }
+  const btn = document.getElementById('mic-pedido-btn');
+  btn.innerHTML = '🎙️ Falar pedido';
+  btn.classList.remove('gravando');
+  const box = document.getElementById('mic-pedido-transcricao');
+  box.style.display = 'none';
+  const texto = transcricaoPedidoAcumulada.trim();
+  if(texto.length > 3) mostrarValidacaoPedido(texto);
+  else toast('Nada captado. Tente novamente.');
+  transcricaoPedidoAcumulada = '';
+}
+
+function pararMicPedido(){
+  gravandoPedido = false;
+  if(recognitionPedido){ try{ recognitionPedido.stop(); }catch(e){} }
+  document.getElementById('mic-pedido-btn').innerHTML = '🎙️ Falar pedido';
+  document.getElementById('mic-pedido-btn').classList.remove('gravando');
+  transcricaoPedidoAcumulada = '';
+}
+
+function mostrarValidacaoPedido(texto){
+  // Separa blocos por separadores
+  const sep = /próximo[a]?|agora|outro\s+pedido|outra|mais\s+um[a]?|[;]|(?<![\d])\.(?![\d])/gi;
+  const blocos = texto.split(sep).map(b=>b.trim()).filter(b=>b.length>3);
+  const raw = blocos.length ? blocos : [texto];
+  const pedidos = raw.map(bloco => extrairPedidoDeTexto(bloco));
+
+  window._pedidosValidacao = pedidos;
+  renderTabelaValidacaoPedido(pedidos);
+}
+
+function extrairPedidoDeTexto(texto){
+  const t = texto.toLowerCase();
+
+  // Cliente — primeiro nome/@ antes de palavras-chave
+  let cliente = 'Desconhecido';
+  const atMatch = texto.match(/^@(\S+)/);
+  if(atMatch){ cliente = atMatch[1].replace(/_/g,' '); }
+  else {
+    const nomeMatch = texto.match(/^([A-Za-zÀ-ú]{2,}(?:\s[A-Za-zÀ-ú]{2,})?)/);
+    if(nomeMatch) cliente = nomeMatch[1];
+  }
+  cliente = cliente.charAt(0).toUpperCase()+cliente.slice(1).toLowerCase();
+
+  // Quantidade
+  let qtd = 1;
+  const qtdMatch = t.match(/(\d+)\s*(?:unidades?|un|peças?|x)|(?:x|vezes)\s*(\d+)/i) ||
+                   t.match(/^\D*?(\d+)\s*(?:de|do|da)?\s+(?=[a-záàãâéêíóôõúç])/i);
+  if(qtdMatch) qtd = parseInt(qtdMatch[1]||qtdMatch[2])||1;
+
+  // Cor
+  const cores = ['rosa','azul','vermelho[a]?','verde','amarelo[a]?','branco[a]?','preto[a]?',
+    'cinza','bege','laranja','roxo[a]?','marrom','vinho','nude','caramelo',
+    'off[\-\s]white','off white','branca','preta','vermelha','bord[oô]|bordo|bordô',
+    'terracota','mostarda','salmão|salmao','lilás|lilas','cobre','dourado[a]?',
+    'prata','menta','turquesa','coral','chocolate','café|cafe','areia','palha'];
+  let cor = '';
+  for(const c of cores){
+    const m = t.match(new RegExp('(?:^|[\s,])('+c+')(?:[\s,.]|$)','i'));
+    if(m){ cor = (m[1]||'').trim(); break; }
+  }
+
+  // Tamanho
+  const tamMatch = t.match(/\btamanho\s*(pp|p|m|g{1,2}|xg|xxg|único|unico|u)\b|\b(pp|gg|xg|xxg|único|unico)\b|(?<![a-záàãâéêíóôõúç])(p|m|g)(?![a-záàãâéêíóôõúç])/i);
+  const tam = tamMatch ? (tamMatch[1]||tamMatch[2]||tamMatch[3]||'').toUpperCase() : '';
+
+  // Produto — tenta vincular ao catálogo
+  const linhaLow = t;
+  let prodVinculado = null;
+  let melhorScore = 0;
+  produtos.filter(p=>p.ativo!==false).forEach(p=>{
+    let score = 0;
+    if(linhaLow.includes(p.id.toLowerCase())) score+=10;
+    const palavras = p.nome.toLowerCase().split(/\s+/).filter(w=>w.length>2);
+    palavras.forEach(w=>{ if(linhaLow.includes(w)) score+=2; });
+    if(p.cor && linhaLow.includes(p.cor.toLowerCase())) score+=3;
+    if(p.tam && linhaLow.includes(p.tam.toLowerCase())) score+=3;
+    if(score>melhorScore){ melhorScore=score; prodVinculado=p; }
+  });
+
+  // Observação — pega texto depois de "obs", "observação", "atenção"
+  const obsMatch = texto.match(/(?:obs|observa[çc][ãa]o|aten[çc][ãa]o)[:\s]+(.+)/i);
+  const obs = obsMatch ? obsMatch[1].trim() : '';
+
+  return {
+    cliente,
+    idproduto: prodVinculado?.id || null,
+    produto: prodVinculado?.nome || extrairNomeProdutoPedido(texto, cliente, cor, tam),
+    cor: cor ? cor.charAt(0).toUpperCase()+cor.slice(1) : (prodVinculado?.cor||''),
+    tam: tam || (prodVinculado?.tam||''),
+    qtd,
+    valorVenda: prodVinculado?.venda || null,
+    subtotal: prodVinculado ? qtd * prodVinculado.venda : null,
+    obs
+  };
+}
+
+function extrairNomeProdutoPedido(texto, cliente, cor, tam){
+  let nome = texto
+    .replace(new RegExp('^'+cliente+'\\s*[,\\-]?\\s*','i'), '')
+    .replace(/\d+\s*(?:unidades?|un|peças?|x)\s*/gi, '')
+    .replace(/(?:obs|observa[çc][ãa]o|aten[çc][ãa]o)[:\s]+.*/gi, '')
+    .replace(/\btamanho\b[^,\.;]*/gi, '')
+    .replace(/\breais\b/gi,' ').replace(/\bcentavos\b/gi,' ')
+    .replace(/\bcor\b/gi,' ');
+  if(cor) nome = nome.replace(new RegExp('\\b'+cor+'\\b','gi'),' ');
+  if(tam) nome = nome.replace(new RegExp('(?<![a-z])'+tam+'(?![a-z])','gi'),' ');
+  return nome.replace(/[,;.!?]+/g,' ').replace(/\s+/g,' ').trim()
+    .split(' ').filter(w=>w.length>1)
+    .map(w=>w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(' ')
+    || 'Produto não identificado';
+}
+
+function renderTabelaValidacaoPedido(pedidos){
+  const val = document.getElementById('mic-pedido-validacao');
+  val.style.display = 'block';
+  val.innerHTML = `
+    <div class="val-header">
+      <span>${pedidos.length} pedido${pedidos.length!==1?'s':''} identificado${pedidos.length!==1?'s':''} — revise e confirme</span>
+      <button class="mic-btn" onclick="cancelarValidacaoPedido()" style="padding:4px 10px;font-size:12px;">✕ Cancelar</button>
+    </div>
+    <div style="overflow-x:auto;">
+    <table class="val-table">
+      <thead><tr>
+        <th>Cliente</th><th>Produto vinculado</th><th>Cor</th><th>Tam.</th>
+        <th>Qtd</th><th>Valor unit.</th><th>Obs</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${pedidos.map((p,i)=>{
+          const prodRef = produtos.find(x=>x.id===p.idproduto);
+          const estAtual = prodRef ? (prodRef.estoque||0) : null;
+          const semEstoque = estAtual !== null && estAtual === 0;
+          const estoqueInsuf = estAtual !== null && estAtual < (p.qtd||1);
+          const estoqueBaixo = estAtual !== null && estAtual > 0 && estAtual <= 3;
+          const vinculo = p.idproduto
+            ? `<span style="font-size:10px;color:var(--accent);">[${p.idproduto}]</span> ${p.produto}`
+            : `<span style="font-size:11px;color:var(--red);">⚠ não vinculado</span> ${p.produto}`;
+          const alertaEst = semEstoque
+            ? `<div style="font-size:10px;color:var(--red);margin-top:2px;">🚨 Estoque esgotado!</div>`
+            : estoqueInsuf
+            ? `<div style="font-size:10px;color:#faae00;margin-top:2px;">⚠ Estoque insuficiente (${estAtual} disponível)</div>`
+            : estoqueBaixo
+            ? `<div style="font-size:10px;color:#faae00;margin-top:2px;">⚠ Apenas ${estAtual} em estoque</div>`
+            : '';
+          return `<tr style="${semEstoque||estoqueInsuf?'background:rgba(255,107,107,0.06);':''}">
+            <td><input value="${p.cliente||''}" onchange="atualizarPedidoVal(${i},'cliente',this.value)" /></td>
+            <td style="font-size:12px;">${vinculo}${alertaEst}</td>
+            <td><input value="${p.cor||''}" style="width:70px;" onchange="atualizarPedidoVal(${i},'cor',this.value)" /></td>
+            <td><input value="${p.tam||''}" style="width:50px;" onchange="atualizarPedidoVal(${i},'tam',this.value)" /></td>
+            <td><input type="number" value="${p.qtd||1}" style="width:55px;" onchange="atualizarPedidoVal(${i},'qtd',this.value)" /></td>
+            <td style="font-size:12px;color:var(--accent);">${p.valorVenda?'R$ '+p.valorVenda.toFixed(2).replace('.',','):'a combinar'}</td>
+            <td><input value="${p.obs||''}" placeholder="opcional" onchange="atualizarPedidoVal(${i},'obs',this.value)" /></td>
+            <td><button class="btn btn-danger" onclick="removerLinhaPedidoVal(${i})">✕</button></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    </div>
+    <div class="btn-row" style="margin-top:8px;">
+      <button class="btn btn-accent" onclick="confirmarValidacaoPedido()">✓ Confirmar pedidos</button>
+      <button class="mic-btn" onclick="cancelarValidacaoPedido()">Cancelar</button>
+    </div>`;
+}
+
+function atualizarPedidoVal(i, campo, valor){
+  if(!window._pedidosValidacao) return;
+  window._pedidosValidacao[i][campo] = ['qtd'].includes(campo) ? parseInt(valor)||1
+    : ['valorVenda','subtotal'].includes(campo) ? parseFloat(valor)||0 : valor;
+}
+
+function removerLinhaPedidoVal(i){
+  if(!window._pedidosValidacao) return;
+  window._pedidosValidacao.splice(i,1);
+  renderTabelaValidacaoPedido(window._pedidosValidacao);
+}
+
+function confirmarValidacaoPedido(){
+  const pedidos = window._pedidosValidacao || [];
+  let ok = 0;
+  let alertasEstoque = [];
+  pedidos.forEach(p => {
+    if(!p.cliente || p.cliente==='Desconhecido') return;
+    const prod = produtos.find(x=>x.id===p.idproduto);
+    const valorVenda = prod ? prod.venda : p.valorVenda;
+    const qtd = p.qtd || 1;
+
+    // Verifica e desconta estoque
+    if(prod){
+      const estAtual = prod.estoque||0;
+      if(estAtual === 0){
+        alertasEstoque.push({produto:prod.nome, tipo:'zerado'});
+      } else if(estAtual < qtd){
+        alertasEstoque.push({produto:prod.nome, tipo:'zerado'});
+      }
+      prod.estoque = Math.max(0, estAtual - qtd);
+      if(prod.estoque === 0) alertasEstoque.push({produto:prod.nome, tipo:'zerado'});
+      else if(prod.estoque === 1) alertasEstoque.push({produto:prod.nome, tipo:'ultimo'});
+    }
+
+    vendas.push({
+      cliente: p.cliente,
+      idproduto: p.idproduto || null,
+      produto: p.produto || 'Não identificado',
+      cor: p.cor || '',
+      tam: p.tam || '',
+      qtd,
+      valorVenda,
+      subtotal: valorVenda ? qtd * valorVenda : null,
+      status: 'Em separação',
+      obs: p.obs || ''
+    });
+    ok++;
+  });
+  salvar(); updateStats(); renderVendas();
+  cancelarValidacaoPedido();
+  salvar();
+  if(alertasEstoque.length){
+    // Mostra alertas urgentes em sequência
+    const unicos = alertasEstoque.filter((a,i,arr)=>arr.findIndex(x=>x.produto===a.produto&&x.tipo===a.tipo)===i);
+    unicos.forEach((a,i)=>{
+      setTimeout(()=>alertaEstoqueUrgente(a.produto, a.tipo), i*1000);
+    });
+  }
+  toast(ok+' pedido'+(ok!==1?'s':'')+' registrado'+(ok!==1?'s':'')+'!');
+  setPage('vendas');
+}
+
+function cancelarValidacaoPedido(){
+  const val = document.getElementById('mic-pedido-validacao');
+  val.style.display = 'none';
+  val.innerHTML = '';
+  window._pedidosValidacao = [];
+}
+
+// ESTOQUE
+function renderEstoque(){
+  const filtro = (document.getElementById('est-filtro')?.value||'').toLowerCase();
+  const ordem  = document.getElementById('est-ordem')?.value || 'id';
+
+  // Stats gerais
+  const ativos   = produtos.filter(p=>p.ativo!==false);
+  const zerados  = ativos.filter(p=>(p.estoque||0)===0);
+  const criticos = ativos.filter(p=>(p.estoque||0)>0 && (p.estoque||0)<=3);
+  const totalEst = ativos.reduce((s,p)=>s+(p.estoque||0),0);
+
+  document.getElementById('est-ativos').textContent   = ativos.length;
+  document.getElementById('est-total').textContent    = totalEst;
+  document.getElementById('est-zerados').textContent  = zerados.length;
+  document.getElementById('est-criticos').textContent = criticos.length;
+
+  // Badge no menu
+  const badge = document.getElementById('badge-estoque');
+  if(zerados.length+criticos.length > 0){
+    badge.textContent = zerados.length+criticos.length;
+    badge.style.display = '';
+  } else {
+    badge.style.display = 'none';
+  }
+
+  // Calcula vendidos por produto
+  const vendidosPorId = {};
+  vendas.forEach(v=>{
+    if(v.idproduto) vendidosPorId[v.idproduto] = (vendidosPorId[v.idproduto]||0) + v.qtd;
+  });
+
+  // Filtra
+  let lista = ativos.filter(p=>{
+    if(!filtro) return true;
+    return p.id.toLowerCase().includes(filtro) ||
+           p.nome.toLowerCase().includes(filtro) ||
+           (p.cor||'').toLowerCase().includes(filtro) ||
+           (p.tam||'').toLowerCase().includes(filtro);
+  });
+
+  // Ordena
+  lista.sort((a,b)=>{
+    if(ordem==='id')           return a.id.localeCompare(b.id,'pt',{numeric:true});
+    if(ordem==='nome')         return a.nome.localeCompare(b.nome,'pt');
+    if(ordem==='estoque-asc')  return (a.estoque||0)-(b.estoque||0);
+    if(ordem==='estoque-desc') return (b.estoque||0)-(a.estoque||0);
+    return 0;
+  });
+
+  const tbody = document.getElementById('est-body');
+  if(!lista.length){
+    tbody.innerHTML = '<tr><td colspan="9" class="empty">Nenhum produto encontrado.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = lista.map(p=>{
+    const est = p.estoque||0;
+    const vend = vendidosPorId[p.id]||0;
+    let situacao, sitColor, sitBg;
+    if(est===0){
+      situacao='Zerado'; sitColor='var(--red)'; sitBg='var(--red-bg)';
+    } else if(est<=3){
+      situacao='Crítico'; sitColor='#faae00'; sitBg='rgba(250,174,0,0.1)';
+    } else if(est<=10){
+      situacao='Baixo'; sitColor='var(--blue)'; sitBg='rgba(96,165,250,0.1)';
+    } else {
+      situacao='OK'; sitColor='var(--green)'; sitBg='var(--green-bg)';
+    }
+    const dispHtml = p.ativo===false
+      ? '<span style="color:var(--red);font-size:12px;">❌</span>'
+      : '<span style="color:var(--green);font-size:12px;">✅</span>';
+
+    return `<tr style="${est===0?'opacity:0.6':''}">
+      <td><span class="tag">${p.id}</span></td>
+      <td>${p.nome}</td>
+      <td>${p.cor?'<span style="font-size:11px;padding:2px 7px;border-radius:20px;background:var(--surface2);border:1px solid var(--border2);color:var(--muted);">'+p.cor+'</span>':'—'}</td>
+      <td>${p.tam?'<span style="font-size:11px;padding:2px 7px;border-radius:20px;background:var(--surface2);border:1px solid var(--border2);color:var(--muted);">'+p.tam+'</span>':'—'}</td>
+      <td style="font-weight:600;font-size:15px;">${est}</td>
+      <td style="color:var(--muted);">${vend>0?vend:'—'}</td>
+      <td><span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:${sitBg};color:${sitColor};">${situacao}</span></td>
+      <td>${dispHtml}</td>
+      <td><button class="btn btn-ghost" onclick="abrirModal('${p.id}')" style="padding:4px 9px;font-size:12px;">✏️</button></td>
+    </tr>`;
+  }).join('');
+}
+
 // EXPORTAR PRODUTOS
 function exportarProdutos(){
   if(!produtos.length){ toast('Nenhum produto para exportar.'); return; }
@@ -1699,6 +2241,15 @@ function exportarExcel(){
 
 // INIT
 carregar(); renderTudo();
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => console.log('SW registrado:', reg.scope))
+      .catch(err => console.log('SW erro:', err));
+  });
+}
 </script>
 </body>
 </html>
