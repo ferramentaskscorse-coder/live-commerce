@@ -98,7 +98,7 @@
   .btn-danger:hover{background:var(--red-bg);}
   .btn-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
   table{width:100%;border-collapse:collapse;font-size:12px;}
-  th{text-align:left;padding:8px 9px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);font-size:11px;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;position:sticky;top:0;background:var(--surface);z-index:1;}
+  th{text-align:left;padding:8px 9px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);font-size:11px;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;position:sticky;top:0;background:var(--surface2);z-index:2;box-shadow:0 1px 0 var(--border);}
   td{padding:7px 8px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;word-break:break-word;}
   tr:last-child td{border-bottom:none;}
   tr:hover td{background:rgba(255,255,255,.02);}
@@ -270,7 +270,7 @@
             <option value="nome">Por nome</option>
           </select>
         </div>
-        <div style="overflow-x:auto;overflow-y:auto;max-height:600px;">
+        <div style="overflow-x:auto;overflow-y:auto;max-height:570px;border:1px solid var(--border);border-radius:var(--radius);">
           <table>
             <thead><tr>
               <th style="width:12%;">ID</th><th style="min-width:120px;">Produto</th><th style="min-width:80px;">Cor</th><th style="min-width:75px;">Tamanho</th><th style="min-width:50px;">Estq.</th>
@@ -590,8 +590,8 @@ function renderProdutos(){
     const margem=p.venda>0?(((p.venda-p.custo-p.embalagem)/p.venda)*100).toFixed(0)+'%':'—';
     const cor=parseFloat(margem)>=0?'var(--green)':'var(--red)';
     const ativoHtml=p.ativo===false?'<span style="color:var(--red);font-size:12px;">❌</span>':'<span style="color:var(--green);font-size:12px;">✅</span>';
-    return `<tr>
-      <td><span class="tag">${p.id}</span></td><td>${p.nome}</td><td>${p.cor?'<span style="font-size:11px;padding:2px 7px;border-radius:20px;background:var(--surface2);border:1px solid var(--border2);color:var(--muted);">'+p.cor+'</span>':'—'}</td><td>${p.tam?'<span style="font-size:11px;padding:2px 7px;border-radius:20px;background:var(--surface2);border:1px solid var(--border2);color:var(--muted);">'+p.tam+'</span>':'—'}</td><td>${p.estoque}</td>
+    return `<tr style="height:38px;">
+      <td style="white-space:nowrap;"><span class="tag">${p.id}</span></td><td>${p.nome}</td><td>${p.cor?'<span style="font-size:11px;padding:2px 7px;border-radius:20px;background:var(--surface2);border:1px solid var(--border2);color:var(--muted);">'+p.cor+'</span>':'—'}</td><td>${p.tam?'<span style="font-size:11px;padding:2px 7px;border-radius:20px;background:var(--surface2);border:1px solid var(--border2);color:var(--muted);">'+p.tam+'</span>':'—'}</td><td>${p.estoque}</td>
       <td>${fmt(p.custo)}</td><td style="font-weight:600;color:var(--accent);">${fmt(p.venda)}</td>
       <td>${fmt(p.embalagem)}</td>
       <td>${ativoHtml}</td>
@@ -1747,10 +1747,12 @@ function salvarEdicao(){
     vendas.forEach(v=>{ if(v.idproduto===_editandoId) v.idproduto=novoId; });
   }
 
+  const dataOriginal = produtos[idx].dataCadastro || new Date().toLocaleDateString('pt-BR');
   produtos[idx] = {
     id:        novoId,
     nome:      document.getElementById('m-nome').value.trim(),
     ativo:     document.getElementById('m-ativo').value==='1',
+    dataCadastro: dataOriginal,
     cor:       document.getElementById('m-cor').value.trim(),
     tam:       document.getElementById('m-tam').value.trim(),
     estoque:   parseFloat(document.getElementById('m-estoque').value)||0,
