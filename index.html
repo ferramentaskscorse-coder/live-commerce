@@ -501,6 +501,16 @@ function salvar(){ localStorage.setItem(CHAVE, JSON.stringify({produtos,vendas,f
 function carregar(){
   try{ const d=JSON.parse(localStorage.getItem(CHAVE)||'{}'); produtos=d.produtos||[]; vendas=d.vendas||[]; fretes=d.fretes||{}; }
   catch(e){ produtos=[];vendas=[];fretes={}; }
+
+  // Preenche data de cadastro para produtos sem data (cadastrados antes dessa versão)
+  const ontem = new Date();
+  ontem.setDate(ontem.getDate() - 1);
+  const ontemStr = ontem.toLocaleDateString('pt-BR');
+  let atualizado = false;
+  produtos.forEach(p => {
+    if(!p.dataCadastro){ p.dataCadastro = ontemStr; atualizado = true; }
+  });
+  if(atualizado) salvar();
 }
 function toast(msg){ const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2200); }
 function fmt(v){ return v==null?'—':'R$ '+Number(v).toFixed(2).replace('.',','); }
