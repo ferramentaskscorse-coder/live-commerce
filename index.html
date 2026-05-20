@@ -1625,27 +1625,22 @@ function extrairProdutoDeTexto(texto){
     /(?:código|codigo|id|referência|referencia|ref)\s*[:\-]?\s*([a-z0-9\-_]+)/i
   );
 
-  // COR — captura o que vem depois da palavra "cor" até o próximo espaço/vírgula
+  // COR
+  const cores = [
+    'rosa','azul','vermelho[a]?','verde','amarelo[a]?','branco[a]?','preto[a]?',
+    'cinza','bege','laranja','roxo[a]?','marrom','vinho','nude','caramelo',
+    'off[\-\s]white','off white','branca','preta','vermelha',
+    'bord[oô]|bordo|bordô','terracota','mostarda','salmão|salmao',
+    'lilás|lilas','cobre','dourado[a]?','prata','menta','turquesa',
+    'coral','chocolate','café|cafe','areia','palha'
+  ];
   let corVal = '';
-  const corKeyMatch = texto.match(/\bcor[:\s]+([\wÀ-úÀ-ÿ][\wÀ-úÀ-ÿ-]*)/i);
-  if(corKeyMatch){
-    corVal = corKeyMatch[1].trim();
-  } else {
-    // Fallback: lista de cores conhecidas
-    const cores = [
-      'rosa','azul','vermelho','vermelha','verde','amarelo','amarela','branco','branca',
-      'preto','preta','cinza','bege','laranja','roxo','roxa','marrom','vinho','nude',
-      'caramelo','off-white','bordo','bordô','terracota','mostarda','salmão','salmao',
-      'lilas','lilás','cobre','dourado','dourada','prata','menta','turquesa',
-      'coral','chocolate','cafe','café','areia','palha'
-    ];
-    for(const c of cores){
-      try{
-        const re = new RegExp('(?:^|[\\s,])(' + c + ')(?:[\\s,\\.]|$)', 'i');
-        const m = texto.match(re);
-        if(m){ corVal = (m[1]||'').trim(); if(corVal) break; }
-      }catch(e){}
-    }
+  for(const c of cores){
+    try{
+      const re = new RegExp('(?:^|[\\s,])(' + c + ')(?:[\\s,\\.]|$)', 'i');
+      const m = texto.match(re);
+      if(m){ corVal = (m[1]||'').trim(); if(corVal) break; }
+    }catch(e){}
   }
 
   // TAMANHO
@@ -1676,22 +1671,15 @@ function extrairProdutoDeTexto(texto){
     .replace(/\btamanho\b[^,\.;\n]*/gi,' ')
     .replace(/\breais\b/gi,' ')
     .replace(/\bcentavos\b/gi,' ')
-    .replace(/\bcor[:\s]+[\wÀ-úÀ-ÿ][\wÀ-úÀ-ÿ-]*/gi,' ')  // remove 'cor marrom', 'cor bordô' etc
-    .replace(/\bcor\b/gi,' ');   // remove 'cor' sozinha
+    .replace(/\bcor\b/gi,' ');
 
   if(corVal){
     try{
-      // Remove "cor palavra" e a cor sozinha do nome
       const corEsc = corVal.replace(/[.*+?^${}()|\[\]\\]/g,'\\$&');
-      nomeClean = nomeClean
-        .replace(new RegExp('\\bcor[:\\s]+'+corEsc+'\\b','gi'),' ')
-        .replace(new RegExp('\\b'+corEsc+'\\b','gi'),' ');
-      // Remove versão sem acento também
+      nomeClean = nomeClean.replace(new RegExp(corEsc,'gi'),' ');
       const corSemAcento = corVal.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
       if(corSemAcento !== corVal){
-        nomeClean = nomeClean
-          .replace(new RegExp('\\bcor[:\\s]+'+corSemAcento+'\\b','gi'),' ')
-          .replace(new RegExp('\\b'+corSemAcento+'\\b','gi'),' ');
+        nomeClean = nomeClean.replace(new RegExp(corSemAcento,'gi'),' ');
       }
     }catch(e){}
   }
@@ -1712,7 +1700,7 @@ function extrairProdutoDeTexto(texto){
   return {
     id:        idMatch ? idMatch[1].toUpperCase() : null,
     nome:      nomeClean || '',
-    cor:       corVal ? (corVal.trim().charAt(0).toUpperCase()+corVal.trim().slice(1).toLowerCase()) : '',
+    cor:       corVal ? corVal.charAt(0).toUpperCase()+corVal.slice(1) : '',
     tam:       tamVal,
     custo:     custoMatch  ? toNum(custoMatch[1])  : 0,
     venda:     vendaMatch  ? toNum(vendaMatch[1])  : 0,
@@ -1976,8 +1964,7 @@ function extrairNomeProdutoPedido(texto, cliente, cor, tam){
     .replace(/(?:obs|observa[çc][ãa]o|aten[çc][ãa]o)[:\s]+.*/gi, '')
     .replace(/\btamanho\b[^,\.;]*/gi, '')
     .replace(/\breais\b/gi,' ').replace(/\bcentavos\b/gi,' ')
-    .replace(/\bcor[:\s]+[\wÀ-úÀ-ÿ][\wÀ-úÀ-ÿ-]*/gi,' ')  // remove 'cor marrom', 'cor bordô' etc
-    .replace(/\bcor\b/gi,' ');   // remove 'cor' sozinha
+    .replace(/\bcor\b/gi,' ');
   if(cor) nome = nome.replace(new RegExp('\\b'+cor+'\\b','gi'),' ');
   if(tam) nome = nome.replace(new RegExp('(?<![a-z])'+tam+'(?![a-z])','gi'),' ');
   return nome.replace(/[,;.!?]+/g,' ').replace(/\s+/g,' ').trim()
