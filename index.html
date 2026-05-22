@@ -10,7 +10,7 @@
 <meta name="description" content="Gestão de vendas para lives no Instagram" />
 <link rel="manifest" href="manifest.json" />
 <link rel="apple-touch-icon" href="icon-192.png" />
-<title>Live Commerce — Gestão de Vendas</title>
+<title>Live Commerce — Gestão de Vendas v3</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <style>
   :root {
@@ -567,7 +567,7 @@ function updateStats(){
   const clientes=getClientes();
   const totalFretePago=clientes.reduce((s,c)=>{ const f=fretes[c.cliente.toLowerCase()]; return s+(f&&f.frete?parseFloat(f.frete):0); },0);
   const bruto=getVendasAtivas().reduce((s,v)=>s+(v.subtotal||0),0)+totalFretePago;
-  const custos=vendasAtivas.reduce((s,v)=>{ const p=produtos.find(x=>x.id===v.idproduto); return s+(p?(p.custo+p.embalagem)*v.qtd:0); },0);
+  const custos=getVendasAtivas().reduce((s,v)=>{ const p=produtos.find(x=>x.id===v.idproduto); return s+(p?(p.custo+p.embalagem)*v.qtd:0); },0);
   const liq=bruto-custos;
   document.getElementById('ss-prod').textContent=produtos.length;
   document.getElementById('ss-ped').textContent=vendas.length;
@@ -2517,11 +2517,10 @@ function exportarExcel(){
 carregar(); renderTudo();
 </script>
 <script>
+// Desregistra service workers antigos para evitar cache
 if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('sw.js')
-      .then(reg => console.log('SW registrado:', reg.scope))
-      .catch(err => console.log('SW erro:', err));
+  navigator.serviceWorker.getRegistrations().then(regs=>{
+    regs.forEach(r=>r.unregister());
   });
 }
 </script>
