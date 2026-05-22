@@ -336,6 +336,7 @@ pedro - 2x calça jeans G
         <div class="stat"><div class="stat-label">Itens</div><div class="stat-value" id="sv-itens">0</div></div>
         <div class="stat"><div class="stat-label">Faturamento produtos</div><div class="stat-value green" id="sv-fat">R$ 0,00</div></div>
         <div class="stat"><div class="stat-label">Clientes únicos</div><div class="stat-value" id="sv-cli">0</div></div>
+        <div class="stat"><div class="stat-label">Cancelados (valor)</div><div class="stat-value red" id="sv-cancelados">R$ 0,00</div></div>
       </div>
       <div class="card">
         <div class="card-title">
@@ -345,10 +346,10 @@ pedro - 2x calça jeans G
         <div style="overflow-x:auto;">
           <table>
             <thead><tr>
-              <th style="width:4%;">#</th><th style="width:13%;">Cliente</th><th style="width:10%;">ID produto</th>
-              <th style="width:18%;">Produto</th><th style="width:6%;">Qtd</th>
-              <th style="width:10%;">Valor unit.</th><th style="width:10%;">Subtotal</th>
-              <th style="width:10%;">Data pedido</th><th style="width:7%;">Status</th><th style="width:4%;"></th>
+              <th style="width:4%;">#</th><th style="width:10%;">ID Pedido</th><th style="width:12%;">Cliente</th><th style="width:9%;">ID produto</th>
+              <th style="width:15%;">Produto</th><th style="width:5%;">Qtd</th>
+              <th style="width:9%;">Valor unit.</th><th style="width:9%;">Subtotal</th>
+              <th style="width:9%;">Data pedido</th><th style="width:7%;">Status</th><th style="width:4%;"></th>
             </tr></thead>
             <tbody id="venda-body"><tr><td colspan="9" class="empty">Nenhuma venda ainda.</td></tr></tbody>
           </table>
@@ -429,6 +430,7 @@ pedro - 2x calça jeans G
         <div class="fin-card"><div class="fin-label">Total pedidos</div><div class="fin-value blue" id="fin-pedidos">0</div></div>
         <div class="fin-card"><div class="fin-label">Total frete arrecadado</div><div class="fin-value green" id="fin-frete">R$ 0,00</div></div>
         <div class="fin-card"><div class="fin-label">Ticket médio (c/ frete)</div><div class="fin-value" id="fin-ticket">R$ 0,00</div></div>
+        <div class="fin-card"><div class="fin-label">Cancelados (valor)</div><div class="fin-value red" id="fin-cancelados">R$ 0,00</div><div style="font-size:11px;color:var(--muted);margin-top:4px;" id="fin-cancelados-pct">0% do bruto</div></div>
       </div>
       <div class="card">
         <div class="card-title">Por produto</div>
@@ -558,7 +560,7 @@ function updateStats(){
   const clientes=getClientes();
   const totalFretePago=clientes.reduce((s,c)=>{ const f=fretes[c.cliente.toLowerCase()]; return s+(f&&f.frete?parseFloat(f.frete):0); },0);
   const bruto=vendas.reduce((s,v)=>s+(v.subtotal||0),0)+totalFretePago;
-  const custos=vendas.reduce((s,v)=>{ const p=produtos.find(x=>x.id===v.idproduto); return s+(p?(p.custo+p.embalagem)*v.qtd:0); },0);
+  const custos=vendasAtivas.reduce((s,v)=>{ const p=produtos.find(x=>x.id===v.idproduto); return s+(p?(p.custo+p.embalagem)*v.qtd:0); },0);
   const liq=bruto-custos;
   document.getElementById('ss-prod').textContent=produtos.length;
   document.getElementById('ss-ped').textContent=vendas.length;
@@ -578,6 +580,9 @@ function updateStats(){
   document.getElementById('sv-itens').textContent=itens;
   document.getElementById('sv-fat').textContent=fmt(vendas.reduce((s,v)=>s+(v.subtotal||0),0));
   document.getElementById('sv-cli').textContent=cli;
+  const valCancelados=getClientes().filter(c=>(fretes[c.cliente.toLowerCase()]||{}).status==='Cancelado').reduce((s,c)=>s+c.totalProd,0);
+  const elCanc=document.getElementById('sv-cancelados');
+  if(elCanc) elCanc.textContent=fmt(valCancelados);
   // pos-live stats
   const comFrete=clientes.filter(c=>{ const f=fretes[c.cliente.toLowerCase()]; return f&&f.frete; }).length;
   document.getElementById('pl-cli').textContent=clientes.length;
@@ -794,7 +799,8 @@ function processarComentarios(){
     const estoqueInsuf = estoqueAtual !== null && estoqueAtual < qtd;
     const estoquePos   = estoqueAtual !== null ? estoqueAtual - qtd : null;
 
-    vendas.push({cliente,idproduto,produto:nomeProd,qtd,valorVenda,subtotal,status:'Em separação',dataPedido:new Date().toISOString().split('T')[0],obs:''});
+    const idPedido = 'PED-' + Date.now() + '-' + Math.random().toString(36).substr(2,4).toUpperCase();
+    vendas.push({idPedido,cliente,idproduto,produto:nomeProd,qtd,valorVenda,subtotal,status:'Em separação',dataPedido:new Date().toISOString().split('T')[0],obs:''});
     if(prodVinculado){
       const estoqueAntes = prodVinculado.estoque||0;
       prodVinculado.estoque = Math.max(0, estoqueAntes - qtd);
@@ -856,14 +862,28 @@ function extrairProduto(linha){
 // VENDAS
 function removeVenda(idx){ vendas.splice(idx,1); salvar(); renderVendas(); updateStats(); toast('Venda removida.'); }
 function renderVendas(){
+  // Sincroniza status das vendas com pós-venda por cliente
+  const clientesGrupo = getClientes();
+  clientesGrupo.forEach(c=>{
+    const f = fretes[c.cliente.toLowerCase()]||{};
+    if(f.status){
+      c.itens.forEach(v=>{ v.status = f.status; });
+    }
+  });
   const tbody=document.getElementById('venda-body');
   if(!vendas.length){tbody.innerHTML='<tr><td colspan="9" class="empty">Nenhuma venda ainda.</td></tr>';return;}
   tbody.innerHTML=vendas.map((v,i)=>`<tr>
-    <td style="color:var(--muted);">${i+1}</td><td>${v.cliente}</td>
+    <td style="color:var(--muted);">${i+1}</td>
+    <td style="font-size:10px;color:var(--muted);font-family:var(--mono);">${v.idPedido||'—'}</td>
+    <td>${v.cliente}</td>
     <td><span class="tag">${v.idproduto||'—'}</span></td><td>${v.produto}</td><td>${v.qtd}</td>
     <td>${fmt(v.valorVenda)}</td><td style="font-weight:600;">${fmt(v.subtotal)}</td>
     <td style="font-size:11px;color:var(--muted);">${v.dataPedido||'—'}</td>
-    <td><span class="pill pill-sep">Em sep.</span></td>
+    <td>${(()=>{
+      const st = v.status||'Em separação';
+      const stMap = {'Em separação':'pill-sep','Frete informado':'pill-frete','Pago':'pill-pago','Enviado':'pill-enviado','Cancelado':'pill-cancelado'};
+      return '<span class="pill '+(stMap[st]||'pill-sep')+'">'+st+'</span>';
+    })()}</td>
     <td><button class="btn btn-danger" onclick="removeVenda(${i})">✕</button></td>
   </tr>`).join('');
 }
@@ -893,11 +913,12 @@ function renderPosLive(){
       </div>
       <div class="cliente-card-body">
         <div class="itens-lista">
-          ${c.itens.map(v=>`<div class="item-row">
+          ${c.itens.map((v,vi)=>`<div class="item-row">
             <span class="tag">${v.idproduto||'—'}</span>
             <span class="item-row-nome">${v.produto}</span>
             <span class="item-row-qtd">×${v.qtd}</span>
             <span class="item-row-val">${fmt(v.subtotal)}</span>
+            <button class="btn btn-danger" style="padding:2px 7px;font-size:11px;margin-left:auto;" onclick="removerItemPedido('${k}',${vi})" title="Remover item">✕</button>
           </div>`).join('')}
         </div>
         <div class="frete-row">
@@ -1053,9 +1074,46 @@ function calcularPagamento(k, pgto, _unused){
   toast('Valor final: '+fmt(valorFinal));
 }
 
+function removerItemPedido(k, itemIdx){
+  if(!confirm('Remover este item do pedido?')) return;
+  const cliente = getClientes().find(c=>c.cliente.toLowerCase()===k);
+  if(!cliente) return;
+  const item = cliente.itens[itemIdx];
+  if(!item) return;
+  // Devolve estoque
+  const prod = produtos.find(p=>p.id===item.idproduto);
+  if(prod) prod.estoque = (prod.estoque||0) + item.qtd;
+  // Remove da lista de vendas pelo idPedido
+  const idxVenda = vendas.findIndex(v=>v.idPedido===item.idPedido);
+  if(idxVenda>-1) vendas.splice(idxVenda,1);
+  salvar(); updateStats(); renderPosLive(); renderVendas();
+  toast('Item removido e estoque devolvido.');
+}
+
 function salvarFrete(k,campo,valor){
   if(!fretes[k])fretes[k]={};
   fretes[k][campo]=valor;
+  // Lógica de cancelamento — devolve/desconta estoque
+  if(campo==='status' && valor==='Cancelado' && !fretes[k].dataCancelamento){
+    fretes[k].dataCancelamento = new Date().toLocaleDateString('pt-BR');
+    const clienteCanc = getClientes().find(c=>c.cliente.toLowerCase()===k);
+    if(clienteCanc){
+      clienteCanc.itens.forEach(v=>{
+        const prod = produtos.find(p=>p.id===v.idproduto);
+        if(prod) prod.estoque = (prod.estoque||0) + v.qtd;
+      });
+    }
+  }
+  if(campo==='status' && valor!=='Cancelado' && fretes[k].dataCancelamento){
+    fretes[k].dataCancelamento = null;
+    const clienteReativ = getClientes().find(c=>c.cliente.toLowerCase()===k);
+    if(clienteReativ){
+      clienteReativ.itens.forEach(v=>{
+        const prod = produtos.find(p=>p.id===v.idproduto);
+        if(prod) prod.estoque = Math.max(0,(prod.estoque||0) - v.qtd);
+      });
+    }
+  }
   salvar(); updateStats();
   // atualiza subtotal ao vivo
   const c=getClientes().find(x=>x.cliente.toLowerCase()===k);
@@ -1097,6 +1155,12 @@ function renderRelatorio(){
   document.getElementById('fin-pedidos').textContent=clientes.length;
   document.getElementById('fin-frete').textContent=fmt(totalFrete);
   document.getElementById('fin-ticket').textContent=clientesAtivos.length?fmt(bruto/clientesAtivos.length):'R$ 0,00';
+  const valCanc = clientes.filter(c=>(fretes[c.cliente.toLowerCase()]||{}).status==='Cancelado').reduce((s,c)=>s+c.totalProd,0);
+  const pctCanc = brutoSemDesc>0?((valCanc/brutoSemDesc)*100).toFixed(1)+'%':'0%';
+  const elFC=document.getElementById('fin-cancelados');
+  const elFCP=document.getElementById('fin-cancelados-pct');
+  if(elFC) elFC.textContent=fmt(valCanc);
+  if(elFCP) elFCP.textContent=pctCanc+' do bruto';
 
   // Pedidos cancelados
   const cancelados = clientes.filter(c=>{ const f=fretes[c.cliente.toLowerCase()]||{}; return f.status==='Cancelado'; });
@@ -2016,16 +2080,20 @@ function extrairPedidoDeTexto(texto){
   let melhorScore = 0;
   produtos.filter(p=>p.ativo!==false).forEach(p=>{
     let score = 0;
+    // Match por ID exato — máxima prioridade
     if(linhaLow.includes(p.id.toLowerCase())) score+=20;
-    // Palavras do nome — peso maior, mínimo 3 chars
-    const palavras = p.nome.toLowerCase().split(/\s+/).filter(w=>w.length>3);
+    // Match por nome — normaliza maiúsculas/minúsculas/acentos
+    const nomeNorm = p.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const linhaNorm = linhaLow.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const palavras = nomeNorm.split(/\s+/).filter(w=>w.length>2);
     const totalPalavras = palavras.length || 1;
     let matchPalavras = 0;
-    palavras.forEach(w=>{ if(linhaLow.includes(w)) matchPalavras++; });
-    score += (matchPalavras / totalPalavras) * 10; // proporcional ao nome
-    // Cor e tamanho são desempate — peso baixo, só conta se nome já matchou
-    if(matchPalavras >= 2){
-      if(p.cor && linhaLow.includes(p.cor.toLowerCase())) score+=1;
+    palavras.forEach(w=>{ if(linhaNorm.includes(w)) matchPalavras++; });
+    const proporcao = matchPalavras / totalPalavras;
+    score += proporcao * 10;
+    // Cor e tamanho só contam se tiver pelo menos 50% do nome matchando
+    if(proporcao >= 0.5){
+      if(p.cor && linhaNorm.includes(p.cor.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''))) score+=1;
       if(p.tam && linhaLow.match(new RegExp('(?:^|\\s)'+p.tam.toLowerCase()+'(?:\\s|$)'))) score+=1;
     }
     if(score>melhorScore){ melhorScore=score; prodVinculado=p; }
@@ -2152,7 +2220,9 @@ function confirmarValidacaoPedido(){
       else if(prod.estoque === 1) alertasEstoque.push({produto:prod.nome, tipo:'ultimo'});
     }
 
+    const idPed = 'PED-' + Date.now() + '-' + Math.random().toString(36).substr(2,4).toUpperCase();
     vendas.push({
+      idPedido: idPed,
       cliente: p.cliente,
       idproduto: p.idproduto || null,
       produto: p.produto || 'Não identificado',
