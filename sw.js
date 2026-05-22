@@ -1,4 +1,4 @@
-const CACHE_NAME = 'live-commerce-v1';
+const CACHE_NAME = 'live-commerce-v3';
 const ASSETS = [
   './index.html',
   './manifest.json'
