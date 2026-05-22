@@ -1102,24 +1102,31 @@ function salvarFrete(k,campo,valor){
   if(!fretes[k])fretes[k]={};
   fretes[k][campo]=valor;
   // Lógica de cancelamento — devolve/desconta estoque
-  if(campo==='status' && valor==='Cancelado' && !fretes[k].dataCancelamento){
-    fretes[k].dataCancelamento = new Date().toLocaleDateString('pt-BR');
-    const clienteCanc = getClientes().find(c=>c.cliente.toLowerCase()===k);
-    if(clienteCanc){
-      clienteCanc.itens.forEach(v=>{
-        const prod = produtos.find(p=>p.id===v.idproduto);
-        if(prod) prod.estoque = (prod.estoque||0) + v.qtd;
-      });
-    }
-  }
-  if(campo==='status' && valor!=='Cancelado' && fretes[k].dataCancelamento){
-    fretes[k].dataCancelamento = null;
-    const clienteReativ = getClientes().find(c=>c.cliente.toLowerCase()===k);
-    if(clienteReativ){
-      clienteReativ.itens.forEach(v=>{
-        const prod = produtos.find(p=>p.id===v.idproduto);
-        if(prod) prod.estoque = Math.max(0,(prod.estoque||0) - v.qtd);
-      });
+  const statusAnterior = fretes[k].status || 'Em separação';
+  if(campo==='status'){
+    if(valor==='Cancelado' && statusAnterior!=='Cancelado'){
+      // Cancelando — devolve estoque
+      fretes[k].dataCancelamento = new Date().toLocaleDateString('pt-BR');
+      const clienteCanc = getClientes().find(c=>c.cliente.toLowerCase()===k);
+      if(clienteCanc){
+        clienteCanc.itens.forEach(v=>{
+          const prod = produtos.find(p=>p.id===v.idproduto);
+          if(prod){
+            prod.estoque = (prod.estoque||0) + v.qtd;
+            console.log('Estoque devolvido:', prod.nome, '->', prod.estoque);
+          }
+        });
+      }
+    } else if(valor!=='Cancelado' && statusAnterior==='Cancelado'){
+      // Reativando — desconta estoque novamente
+      fretes[k].dataCancelamento = null;
+      const clienteReativ = getClientes().find(c=>c.cliente.toLowerCase()===k);
+      if(clienteReativ){
+        clienteReativ.itens.forEach(v=>{
+          const prod = produtos.find(p=>p.id===v.idproduto);
+          if(prod) prod.estoque = Math.max(0,(prod.estoque||0) - v.qtd);
+        });
+      }
     }
   }
   salvar(); updateStats();
