@@ -556,10 +556,17 @@ function getClientes(){
   return Object.values(mapa);
 }
 
+function getVendasAtivas(){
+  return vendas.filter(v=>{
+    const cli = v.cliente?.toLowerCase();
+    return (fretes[cli]||{}).status !== 'Cancelado';
+  });
+}
+
 function updateStats(){
   const clientes=getClientes();
   const totalFretePago=clientes.reduce((s,c)=>{ const f=fretes[c.cliente.toLowerCase()]; return s+(f&&f.frete?parseFloat(f.frete):0); },0);
-  const bruto=vendas.reduce((s,v)=>s+(v.subtotal||0),0)+totalFretePago;
+  const bruto=getVendasAtivas().reduce((s,v)=>s+(v.subtotal||0),0)+totalFretePago;
   const custos=vendasAtivas.reduce((s,v)=>{ const p=produtos.find(x=>x.id===v.idproduto); return s+(p?(p.custo+p.embalagem)*v.qtd:0); },0);
   const liq=bruto-custos;
   document.getElementById('ss-prod').textContent=produtos.length;
@@ -578,7 +585,7 @@ function updateStats(){
   const cli=new Set(vendas.map(v=>v.cliente.toLowerCase())).size;
   document.getElementById('sv-ped').textContent=vendas.length;
   document.getElementById('sv-itens').textContent=itens;
-  document.getElementById('sv-fat').textContent=fmt(vendas.reduce((s,v)=>s+(v.subtotal||0),0));
+  document.getElementById('sv-fat').textContent=fmt(getVendasAtivas().reduce((s,v)=>s+(v.subtotal||0),0));
   document.getElementById('sv-cli').textContent=cli;
   const valCancelados=getClientes().filter(c=>(fretes[c.cliente.toLowerCase()]||{}).status==='Cancelado').reduce((s,c)=>s+c.totalProd,0);
   const elCanc=document.getElementById('sv-cancelados');
@@ -1159,7 +1166,7 @@ function renderRelatorio(){
     const fv=parseFloat(f.frete)||0;
     return s+(f.valorFinal!=null?f.valorFinal:c.totalProd+fv);
   },0):brutoSemDesc;
-  const custos=vendas.reduce((s,v)=>{ const p=produtos.find(x=>x.id===v.idproduto); return s+(p?(p.custo+p.embalagem)*v.qtd:0); },0);
+  const custos=getVendasAtivas().reduce((s,v)=>{ const p=produtos.find(x=>x.id===v.idproduto); return s+(p?(p.custo+p.embalagem)*v.qtd:0); },0);
   const liq=bruto-custos;
   document.getElementById('fin-bruto').textContent=fmt(brutoSemDesc);
   document.getElementById('fin-liquido-real').textContent=fmt(bruto);
@@ -1258,7 +1265,7 @@ function copiarRelatorio(){
     const fv=parseFloat(f.frete)||0;
     return s+(f.valorFinal!=null?f.valorFinal:c.totalProd+fv);
   },0):brutoSemDesc;
-  const custos=vendas.reduce((s,v)=>{ const p=produtos.find(x=>x.id===v.idproduto); return s+(p?(p.custo+p.embalagem)*v.qtd:0); },0);
+  const custos=getVendasAtivas().reduce((s,v)=>{ const p=produtos.find(x=>x.id===v.idproduto); return s+(p?(p.custo+p.embalagem)*v.qtd:0); },0);
   let txt='RELATÓRIO DE LIVE\n'+'='.repeat(44)+'\n\n';
   txt+=`Faturamento bruto : R$ ${fmtN(bruto)}\n`;
   txt+=`Total de custos   : R$ ${fmtN(custos)}\n`;
