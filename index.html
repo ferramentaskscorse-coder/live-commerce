@@ -346,9 +346,9 @@ pedro - 2x calça jeans G
         <div style="overflow-x:auto;">
           <table>
             <thead><tr>
-              <th style="width:4%;">#</th><th style="width:10%;">ID Pedido</th><th style="width:12%;">Cliente</th><th style="width:9%;">ID produto</th>
-              <th style="width:15%;">Produto</th><th style="width:5%;">Qtd</th>
-              <th style="width:9%;">Valor unit.</th><th style="width:9%;">Subtotal</th>
+              <th style="width:4%;">#</th><th style="width:10%;">ID Pedido</th><th style="width:11%;">Cliente</th><th style="width:8%;">ID produto</th>
+              <th style="width:13%;">Produto</th><th style="width:7%;">Cor</th><th style="width:5%;">Qtd</th>
+              <th style="width:8%;">Valor unit.</th><th style="width:8%;">Subtotal</th>
               <th style="width:9%;">Data pedido</th><th style="width:7%;">Status</th><th style="width:4%;"></th>
             </tr></thead>
             <tbody id="venda-body"><tr><td colspan="9" class="empty">Nenhuma venda ainda.</td></tr></tbody>
@@ -892,7 +892,10 @@ function renderVendas(){
     <td style="color:var(--muted);">${i+1}</td>
     <td style="font-size:10px;color:var(--muted);font-family:var(--mono);">${v.idPedido||'—'}</td>
     <td>${v.cliente}</td>
-    <td><span class="tag">${v.idproduto||'—'}</span></td><td>${v.produto}</td><td>${v.qtd}</td>
+    <td><span class="tag">${v.idproduto||'—'}</span></td>
+    <td>${v.produto}</td>
+    <td>${v.cor?'<span style="font-size:11px;padding:2px 7px;border-radius:20px;background:var(--surface2);border:1px solid var(--border2);color:var(--muted);">'+v.cor+'</span>':'—'}</td>
+    <td>${v.qtd}</td>
     <td>${fmt(v.valorVenda)}</td><td style="font-weight:600;">${fmt(v.subtotal)}</td>
     <td style="font-size:11px;color:var(--muted);">${v.dataPedido||'—'}</td>
     <td><span class="pill ${({'Em separação':'pill-sep','Frete informado':'pill-frete','Pago':'pill-pago','Enviado':'pill-enviado','Cancelado':'pill-cancelado'}[v.status||'Em separação']||'pill-sep')}">${v.status||'Em sep.'}</span></td>
@@ -2118,7 +2121,6 @@ function extrairPedidoDeTexto(texto){
       if(p.cor && linhaNorm.includes(p.cor.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''))) score+=1;
       if(p.tam && linhaLow.match(new RegExp('(?:^|\\s)'+p.tam.toLowerCase()+'(?:\\s|$)'))) score+=1;
     }
-    console.log('Score', p.nome, ':', score.toFixed(2), '| match:', matchPalavras+'/'+totalPalavras, '| prop:', proporcao.toFixed(2));
     if(score>melhorScore){ melhorScore=score; prodVinculado=p; }
   });
 
