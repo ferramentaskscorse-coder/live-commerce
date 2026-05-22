@@ -718,12 +718,15 @@ function processarLinhas(rows,result){
 
 // Verifica se a linha contém nome de produto cadastrado (para intenção implícita)
 function prodVinculadoCheck(linha){
-  const linhaLow = linha.toLowerCase();
-  return produtos.filter(p=>p.ativo!==false).some(p=>{
-    const palavras = p.nome.toLowerCase().split(/\s+/).filter(w=>w.length>3);
-    const matches = palavras.filter(w=>linhaLow.includes(w)).length;
-    return matches >= 2;
-  });
+  try{
+    const linhaNorm = linha.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    return produtos.filter(p=>p.ativo!==false).some(p=>{
+      const nomeNorm = p.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      const palavras = nomeNorm.split(/\s+/).filter(w=>w.length>2);
+      const matches = palavras.filter(w=>linhaNorm.includes(w)).length;
+      return matches >= 2;
+    });
+  }catch(e){ return false; }
 }
 
 // LIVE — processamento local sem dependência de API externa
@@ -735,6 +738,7 @@ function processarComentarios(){
   const btn=document.getElementById('btn-processar'); btn.disabled=true;
   document.getElementById('processando').style.display='';
 
+  try{
   const linhas=texto.split(/\n/).map(l=>l.trim()).filter(l=>l.length>2);
   const intencoes=/quero|reserva|anota|me manda|me separa|separa|pega|coloca|bota|queria|preciso|pode separar|pode mandar|manda|me reserva|comprar|compro|quero sim|pode anotar|anota pra mim|me coloca|bora|fecha|confirma|confirmado|pode fechar/i;
   const ignorar=/\?|quanto custa|qual o pre|tem disponível|tem disponivel|linda|amei|adorei|oi |olá|obrigad|parabens|parabéns/i;
@@ -785,8 +789,8 @@ function processarComentarios(){
       if(score>melhorScore){melhorScore=score;prodVinculado=p;}
     });
 
-    // só vincula se tiver match real de nome (score >= 5)
-    if(melhorScore<5) prodVinculado=null;
+    // só vincula se tiver match real de nome (score >= 3)
+    if(melhorScore<3) prodVinculado=null;
 
     const idproduto=prodVinculado?prodVinculado.id:null;
     const nomeProd=prodVinculado?prodVinculado.nome:extrairProduto(linha);
@@ -843,6 +847,10 @@ function processarComentarios(){
     unicos.forEach((a,i)=>{ setTimeout(()=>alertaEstoqueUrgente(a.nome,a.tipo),(i+1)*800); });
   }
 
+  }catch(e){
+    console.error('Erro processamento:', e);
+    toast('Erro ao processar. Verifique o console.');
+  }
   btn.disabled=false;
   document.getElementById('processando').style.display='none';
 }
