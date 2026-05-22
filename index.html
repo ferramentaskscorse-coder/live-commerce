@@ -263,12 +263,15 @@
       <div class="card">
         <div class="card-title">
           Tabela de produtos <span class="card-title-right" id="prod-count"></span>
-          <select id="prod-sort" style="font-size:12px;padding:5px 10px;border-radius:var(--radius);background:var(--surface2);border:1px solid var(--border2);color:var(--text);" onchange="renderProdutos()">
-            <option value="data-desc">Mais recentes</option>
-            <option value="data-asc">Mais antigos</option>
-            <option value="id">Por ID</option>
-            <option value="nome">Por nome</option>
-          </select>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input type="text" id="prod-busca" placeholder="🔍 Buscar por nome, cor, ID..." style="font-size:12px;padding:5px 10px;width:220px;" oninput="renderProdutos()" />
+            <select id="prod-sort" style="font-size:12px;padding:5px 10px;border-radius:var(--radius);background:var(--surface2);border:1px solid var(--border2);color:var(--text);" onchange="renderProdutos()">
+              <option value="data-desc">Mais recentes</option>
+              <option value="data-asc">Mais antigos</option>
+              <option value="id">Por ID</option>
+              <option value="nome">Por nome</option>
+            </select>
+          </div>
         </div>
         <div style="overflow-x:auto;overflow-y:auto;max-height:570px;border:1px solid var(--border);border-radius:var(--radius);">
           <table>
@@ -552,7 +555,9 @@ function updateStats(){
   if(document.getElementById('est-body')) renderEstoque();
   const pendentes=clientes.filter(c=>{ const f=fretes[c.cliente.toLowerCase()]; return !f||!f.frete; }).length;
   const bf=document.getElementById('badge-frete'); bf.textContent=pendentes; bf.style.display=pendentes?'':'none';
-  document.getElementById('prod-count').textContent=produtos.length+' produto'+(produtos.length!==1?'s':'');
+  const _busca=(document.getElementById('prod-busca')?.value||'').trim();
+  const _total=_busca?produtos.filter(p=>p.id.toLowerCase().includes(_busca.toLowerCase())||p.nome.toLowerCase().includes(_busca.toLowerCase())||(p.cor||'').toLowerCase().includes(_busca.toLowerCase())||(p.tam||'').toLowerCase().includes(_busca.toLowerCase())).length:produtos.length;
+  document.getElementById('prod-count').textContent=_total+' produto'+(_total!==1?'s':'')+(_busca&&_total!==produtos.length?' de '+produtos.length:'');
   document.getElementById('venda-count').textContent=vendas.length+' venda'+(vendas.length!==1?'s':'');
   const itens=vendas.reduce((s,v)=>s+v.qtd,0);
   const cli=new Set(vendas.map(v=>v.cliente.toLowerCase())).size;
@@ -589,7 +594,16 @@ function renderProdutos(){
   const tbody=document.getElementById('prod-body');
   if(!produtos.length){tbody.innerHTML='<tr><td colspan="8" class="empty">Nenhum produto cadastrado.</td></tr>';return;}
   const sortVal = document.getElementById('prod-sort')?.value || 'data-desc';
-  const produtosOrdenados=[...produtos].sort((a,b)=>{
+  const busca = (document.getElementById('prod-busca')?.value||'').toLowerCase().trim();
+  const produtosFiltrados = busca
+    ? produtos.filter(p =>
+        p.id.toLowerCase().includes(busca) ||
+        p.nome.toLowerCase().includes(busca) ||
+        (p.cor||'').toLowerCase().includes(busca) ||
+        (p.tam||'').toLowerCase().includes(busca)
+      )
+    : produtos;
+  const produtosOrdenados=[...produtosFiltrados].sort((a,b)=>{
     if(sortVal==='id')        return a.id.localeCompare(b.id,'pt',{numeric:true});
     if(sortVal==='nome')      return a.nome.localeCompare(b.nome,'pt');
     if(sortVal==='data-asc')  return (a.dataCadastro||'').localeCompare(b.dataCadastro||'');
@@ -684,6 +698,16 @@ function processarLinhas(rows,result){
   if(ok)toast(ok+' produto'+(ok>1?'s':'')+' importado'+(ok>1?'s':'')+'!');
 }
 
+// Verifica se a linha contém nome de produto cadastrado (para intenção implícita)
+function prodVinculadoCheck(linha){
+  const linhaLow = linha.toLowerCase();
+  return produtos.filter(p=>p.ativo!==false).some(p=>{
+    const palavras = p.nome.toLowerCase().split(/\s+/).filter(w=>w.length>3);
+    const matches = palavras.filter(w=>linhaLow.includes(w)).length;
+    return matches >= 2;
+  });
+}
+
 // LIVE — processamento local sem dependência de API externa
 function processarComentarios(){
   const texto=document.getElementById('comentarios').value.trim();
@@ -694,7 +718,7 @@ function processarComentarios(){
   document.getElementById('processando').style.display='';
 
   const linhas=texto.split(/\n/).map(l=>l.trim()).filter(l=>l.length>2);
-  const intencoes=/quero|reserva|anota|me manda|me separa|separa|pega|coloca|bota|queria|preciso|pode separar|pode mandar|manda|me reserva|comprar|compro/i;
+  const intencoes=/quero|reserva|anota|me manda|me separa|separa|pega|coloca|bota|queria|preciso|pode separar|pode mandar|manda|me reserva|comprar|compro|quero sim|pode anotar|anota pra mim|me coloca|bora|fecha|confirma|confirmado|pode fechar/i;
   const ignorar=/\?|quanto custa|qual o pre|tem disponível|tem disponivel|linda|amei|adorei|oi |olá|obrigad|parabens|parabéns/i;
 
   let novas=0;
@@ -708,8 +732,13 @@ function processarComentarios(){
       if(nomeMatch) cliente=capitalize(nomeMatch[1]);
     }
 
+    // Intenção implícita: @usuario + quantidade OU @usuario + produto sem curiosidade
+    const temArroba = linha.trim().startsWith('@');
+    const temQuantidade = /\d+\s*(?:unidades?|un\.?|peças?|x\b)|\bx\s*\d+/i.test(linha);
+    const intencaoImplicita = temArroba && (temQuantidade || prodVinculadoCheck(linha));
+
     // ignora se não tem intenção de compra ou parece curiosidade
-    if(!intencoes.test(linha)||ignorar.test(linha)){
+    if((!intencoes.test(linha) && !intencaoImplicita) || ignorar.test(linha)){
       return `<div class="log-item ignorado"><span style="color:var(--muted);">—</span><div style="color:var(--muted);">${cliente}: ignorado</div></div>`;
     }
 
@@ -737,8 +766,8 @@ function processarComentarios(){
       if(score>melhorScore){melhorScore=score;prodVinculado=p;}
     });
 
-    // só vincula se tiver match real de nome (score >= 4)
-    if(melhorScore<4) prodVinculado=null;
+    // só vincula se tiver match real de nome (score >= 5)
+    if(melhorScore<5) prodVinculado=null;
 
     const idproduto=prodVinculado?prodVinculado.id:null;
     const nomeProd=prodVinculado?prodVinculado.nome:extrairProduto(linha);
@@ -1940,10 +1969,10 @@ function extrairPedidoDeTexto(texto){
     let matchPalavras = 0;
     palavras.forEach(w=>{ if(linhaLow.includes(w)) matchPalavras++; });
     score += (matchPalavras / totalPalavras) * 10; // proporcional ao nome
-    // Cor e tamanho só somam se houver match de nome também
-    if(matchPalavras > 0){
-      if(p.cor && linhaLow.includes(p.cor.toLowerCase())) score+=2;
-      if(p.tam && linhaLow.match(new RegExp('(?:^|\\s)'+p.tam.toLowerCase()+'(?:\\s|$)'))) score+=2;
+    // Cor e tamanho são desempate — peso baixo, só conta se nome já matchou
+    if(matchPalavras >= 2){
+      if(p.cor && linhaLow.includes(p.cor.toLowerCase())) score+=1;
+      if(p.tam && linhaLow.match(new RegExp('(?:^|\\s)'+p.tam.toLowerCase()+'(?:\\s|$)'))) score+=1;
     }
     if(score>melhorScore){ melhorScore=score; prodVinculado=p; }
   });
