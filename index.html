@@ -2118,6 +2118,7 @@ function extrairPedidoDeTexto(texto){
       if(p.cor && linhaNorm.includes(p.cor.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''))) score+=1;
       if(p.tam && linhaLow.match(new RegExp('(?:^|\\s)'+p.tam.toLowerCase()+'(?:\\s|$)'))) score+=1;
     }
+    console.log('Score', p.nome, ':', score.toFixed(2), '| match:', matchPalavras+'/'+totalPalavras, '| prop:', proporcao.toFixed(2));
     if(score>melhorScore){ melhorScore=score; prodVinculado=p; }
   });
 
