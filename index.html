@@ -2517,10 +2517,15 @@ function exportarExcel(){
 carregar(); renderTudo();
 </script>
 <script>
-// Desregistra service workers antigos para evitar cache
+// Limpa cache e SW agressivamente
 if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(regs=>{
-    regs.forEach(r=>r.unregister());
+    regs.forEach(r=>{ r.unregister(); console.log('SW removido'); });
+  });
+}
+if('caches' in window){
+  caches.keys().then(keys=>{
+    keys.forEach(k=>{ caches.delete(k); console.log('Cache removido:', k); });
   });
 }
 </script>
