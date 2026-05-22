@@ -197,7 +197,7 @@
     <nav class="nav">
       <div class="nav-item active" onclick="setPage('produtos')"><span class="nav-icon">📦</span> Produtos</div>
       <div class="nav-item" onclick="setPage('live')"><span class="nav-icon">💬</span> Pedido</div>
-      <div class="nav-item" onclick="setPage('poslive')"><span class="nav-icon">📬</span> Pós-venda <span class="nav-badge" id="badge-frete" style="display:none;">0</span></div>
+      <div class="nav-item" onclick="setPage('poslive')"><span class="nav-icon">📬</span> Fechamento <span class="nav-badge" id="badge-frete" style="display:none;">0</span></div>
       <div class="nav-item" onclick="setPage('vendas')"><span class="nav-icon">🛍️</span> Vendas <span class="nav-badge" id="badge-vendas" style="display:none;">0</span></div>
       <div class="nav-item" onclick="setPage('estoque')"><span class="nav-icon">📦</span> Estoque <span class="nav-badge" id="badge-estoque" style="display:none;">0</span></div>
       <div class="nav-item" onclick="setPage('relatorio')"><span class="nav-icon">📊</span> Relatório</div>
@@ -360,7 +360,7 @@ pedro - 2x calça jeans G
     <!-- PÓS-LIVE -->
     <div id="page-poslive" class="page">
       <div class="page-header">
-        <div class="page-title">Pós-venda</div>
+        <div class="page-title">Fechamento</div>
         <div class="page-sub">Gerencie entregas, frete e pagamento de cada cliente. Pedidos cancelados são excluídos do faturamento.</div>
       </div>
       <div class="stats">
@@ -811,8 +811,21 @@ function processarComentarios(){
     const estoqueInsuf = estoqueAtual !== null && estoqueAtual < qtd;
     const estoquePos   = estoqueAtual !== null ? estoqueAtual - qtd : null;
 
+    // Extrai cor do comentário ou pega do produto vinculado
+    const corComent = (()=>{
+      const corKey = linha.match(/\bcor[:\s]+([\wÀ-úÀ-ÿ-]+)/i);
+      if(corKey) return corKey[1].charAt(0).toUpperCase()+corKey[1].slice(1).toLowerCase();
+      if(prodVinculado?.cor) return prodVinculado.cor;
+      return '';
+    })();
+    // Extrai tamanho do comentário
+    const tamComent = (()=>{
+      const tamM = linha.match(/\btamanho\s*(pp|p|m|g{1,2}|xg|xxg)\b|(?<![a-záàãâéêíóôõúç])(pp|gg|xg|xxg)(?![a-záàãâéêíóôõúç])|(?<![a-záàãâéêíóôõúç])(p|m|g)(?![a-záàãâéêíóôõúç])/i);
+      if(tamM) return (tamM[1]||tamM[2]||tamM[3]||'').toUpperCase();
+      return prodVinculado?.tam || '';
+    })();
     const idPedido = 'PED-' + Date.now() + '-' + Math.random().toString(36).substr(2,4).toUpperCase();
-    vendas.push({idPedido,cliente,idproduto,produto:nomeProd,qtd,valorVenda,subtotal,status:'Em separação',dataPedido:new Date().toISOString().split('T')[0],obs:''});
+    vendas.push({idPedido,cliente,idproduto,produto:nomeProd,cor:corComent,tam:tamComent,qtd,valorVenda,subtotal,status:'Em separação',dataPedido:new Date().toISOString().split('T')[0],obs:''});
     if(prodVinculado){
       const estoqueAntes = prodVinculado.estoque||0;
       prodVinculado.estoque = Math.max(0, estoqueAntes - qtd);
@@ -876,7 +889,17 @@ function extrairProduto(linha){
 }
 
 // VENDAS
-function removeVenda(idx){ vendas.splice(idx,1); salvar(); renderVendas(); updateStats(); toast('Venda removida.'); }
+function removeVenda(idx){
+  const v = vendas[idx];
+  // Devolve estoque ao remover venda
+  if(v && v.idproduto){
+    const prod = produtos.find(p=>p.id===v.idproduto);
+    if(prod) prod.estoque = (prod.estoque||0) + v.qtd;
+  }
+  vendas.splice(idx,1);
+  salvar(); renderVendas(); renderEstoque(); updateStats();
+  toast('Venda removida e estoque devolvido.');
+}
 function renderVendas(){
   // Sincroniza status das vendas com pós-venda por cliente
   try{
