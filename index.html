@@ -539,7 +539,7 @@ function setPage(p){
   ids.forEach(id=>{ document.getElementById('page-'+id).classList.toggle('active',id===p); });
   document.querySelectorAll('.nav-item').forEach((el,i)=>el.classList.toggle('active',ids[i]===p));
   if(p==='relatorio') renderRelatorio();
-  if(p==='vendas') renderVendas();
+  if(p==='vendas'){ renderVendas(); updateStats(); }
   if(p==='poslive') renderPosLive();
   if(p==='estoque') renderEstoque();
 }
@@ -738,13 +738,14 @@ function processarComentarios(){
   const btn=document.getElementById('btn-processar'); btn.disabled=true;
   document.getElementById('processando').style.display='';
 
+  let alertasRodadaExt=[];
   try{
   const linhas=texto.split(/\n/).map(l=>l.trim()).filter(l=>l.length>2);
   const intencoes=/quero|reserva|anota|me manda|me separa|separa|pega|coloca|bota|queria|preciso|pode separar|pode mandar|manda|me reserva|comprar|compro|quero sim|pode anotar|anota pra mim|me coloca|bora|fecha|confirma|confirmado|pode fechar/i;
   const ignorar=/\?|quanto custa|qual o pre|tem disponível|tem disponivel|linda|amei|adorei|oi |olá|obrigad|parabens|parabéns/i;
 
   let novas=0;
-  const alertasRodada=[];
+  const alertasRodada=alertasRodadaExt;
   const logHTML=linhas.map(linha=>{
     // extrai cliente
     let cliente='Desconhecido';
@@ -811,9 +812,9 @@ function processarComentarios(){
       const estoqueRestante = prodVinculado.estoque;
       // Coleta alertas — dispara só no final do processamento
       if(estoqueAntes > 0 && estoqueRestante === 0){
-        alertasRodada.push({nome: prodVinculado.nome, tipo: 'zerado'});
+        alertasRodadaExt.push({nome: prodVinculado.nome, tipo: 'zerado'});
       } else if(estoqueAntes > 1 && estoqueRestante === 1){
-        alertasRodada.push({nome: prodVinculado.nome, tipo: 'ultimo'});
+        alertasRodadaExt.push({nome: prodVinculado.nome, tipo: 'ultimo'});
       }
     }
     novas++;
@@ -842,8 +843,8 @@ function processarComentarios(){
   document.getElementById('comentarios').value='';
   document.getElementById('log-area').innerHTML=`<div class="card"><div class="card-title">Resultado <span class="card-title-right" style="color:var(--green);">${novas} venda${novas!==1?'s':''} registrada${novas!==1?'s':''}</span></div>${logHTML}</div>`;
   toast(novas+' venda'+(novas!==1?'s':'')+' registrada'+(novas!==1?'s':'')+'!');
-  if(alertasRodada.length){
-    const unicos=alertasRodada.filter((a,i,arr)=>arr.findIndex(x=>x.nome===a.nome&&x.tipo===a.tipo)===i);
+  if(alertasRodadaExt.length){
+    const unicos=alertasRodadaExt.filter((a,i,arr)=>arr.findIndex(x=>x.nome===a.nome&&x.tipo===a.tipo)===i);
     unicos.forEach((a,i)=>{ setTimeout(()=>alertaEstoqueUrgente(a.nome,a.tipo),(i+1)*800); });
   }
 
@@ -871,13 +872,13 @@ function extrairProduto(linha){
 function removeVenda(idx){ vendas.splice(idx,1); salvar(); renderVendas(); updateStats(); toast('Venda removida.'); }
 function renderVendas(){
   // Sincroniza status das vendas com pós-venda por cliente
-  const clientesGrupo = getClientes();
-  clientesGrupo.forEach(c=>{
-    const f = fretes[c.cliente.toLowerCase()]||{};
-    if(f.status){
-      c.itens.forEach(v=>{ v.status = f.status; });
-    }
-  });
+  try{
+    const clientesGrupo = getClientes();
+    clientesGrupo.forEach(c=>{
+      const f = fretes[c.cliente.toLowerCase()]||{};
+      if(f.status) c.itens.forEach(v=>{ v.status = f.status; });
+    });
+  }catch(e){ console.warn('sync status:', e); }
   const tbody=document.getElementById('venda-body');
   if(!vendas.length){tbody.innerHTML='<tr><td colspan="9" class="empty">Nenhuma venda ainda.</td></tr>';return;}
   tbody.innerHTML=vendas.map((v,i)=>`<tr>
@@ -887,11 +888,7 @@ function renderVendas(){
     <td><span class="tag">${v.idproduto||'—'}</span></td><td>${v.produto}</td><td>${v.qtd}</td>
     <td>${fmt(v.valorVenda)}</td><td style="font-weight:600;">${fmt(v.subtotal)}</td>
     <td style="font-size:11px;color:var(--muted);">${v.dataPedido||'—'}</td>
-    <td>${(()=>{
-      const st = v.status||'Em separação';
-      const stMap = {'Em separação':'pill-sep','Frete informado':'pill-frete','Pago':'pill-pago','Enviado':'pill-enviado','Cancelado':'pill-cancelado'};
-      return '<span class="pill '+(stMap[st]||'pill-sep')+'">'+st+'</span>';
-    })()}</td>
+    <td><span class="pill ${({'Em separação':'pill-sep','Frete informado':'pill-frete','Pago':'pill-pago','Enviado':'pill-enviado','Cancelado':'pill-cancelado'}[v.status||'Em separação']||'pill-sep')}">${v.status||'Em sep.'}</span></td>
     <td><button class="btn btn-danger" onclick="removeVenda(${i})">✕</button></td>
   </tr>`).join('');
 }
@@ -1108,14 +1105,17 @@ function salvarFrete(k,campo,valor){
       // Cancelando — devolve estoque
       fretes[k].dataCancelamento = new Date().toLocaleDateString('pt-BR');
       const clienteCanc = getClientes().find(c=>c.cliente.toLowerCase()===k);
+      console.log('CANCELANDO:', k, '| cliente encontrado:', !!clienteCanc, '| itens:', clienteCanc?.itens?.length);
       if(clienteCanc){
         clienteCanc.itens.forEach(v=>{
           const prod = produtos.find(p=>p.id===v.idproduto);
+          console.log('Item:', v.produto, '| prod encontrado:', !!prod, '| qtd:', v.qtd);
           if(prod){
             prod.estoque = (prod.estoque||0) + v.qtd;
             console.log('Estoque devolvido:', prod.nome, '->', prod.estoque);
           }
         });
+        salvar(); renderProdutos(); renderEstoque(); updateStats();
       }
     } else if(valor!=='Cancelado' && statusAnterior==='Cancelado'){
       // Reativando — desconta estoque novamente
