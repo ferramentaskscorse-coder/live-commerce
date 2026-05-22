@@ -109,6 +109,7 @@
   .pill-frete{background:rgba(96,165,250,.12);color:var(--blue);}
   .pill-pago{background:var(--green-bg);color:var(--green);}
   .pill-enviado{background:rgba(167,139,250,.12);color:#a78bfa;}
+  .pill-cancelado{background:rgba(255,107,107,.12);color:var(--red);text-decoration:line-through;}
   .spinner{display:inline-block;width:13px;height:13px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;}
   @keyframes spin{to{transform:rotate(360deg)}}
   .empty{text-align:center;padding:2rem;color:var(--muted2);font-size:13px;}
@@ -196,7 +197,7 @@
     <nav class="nav">
       <div class="nav-item active" onclick="setPage('produtos')"><span class="nav-icon">📦</span> Produtos</div>
       <div class="nav-item" onclick="setPage('live')"><span class="nav-icon">💬</span> Pedido</div>
-      <div class="nav-item" onclick="setPage('poslive')"><span class="nav-icon">📬</span> Pós-live <span class="nav-badge" id="badge-frete" style="display:none;">0</span></div>
+      <div class="nav-item" onclick="setPage('poslive')"><span class="nav-icon">📬</span> Pós-venda <span class="nav-badge" id="badge-frete" style="display:none;">0</span></div>
       <div class="nav-item" onclick="setPage('vendas')"><span class="nav-icon">🛍️</span> Vendas <span class="nav-badge" id="badge-vendas" style="display:none;">0</span></div>
       <div class="nav-item" onclick="setPage('estoque')"><span class="nav-icon">📦</span> Estoque <span class="nav-badge" id="badge-estoque" style="display:none;">0</span></div>
       <div class="nav-item" onclick="setPage('relatorio')"><span class="nav-icon">📊</span> Relatório</div>
@@ -358,8 +359,8 @@ pedro - 2x calça jeans G
     <!-- PÓS-LIVE -->
     <div id="page-poslive" class="page">
       <div class="page-header">
-        <div class="page-title">Pós-live</div>
-        <div class="page-sub">Adicione endereço e frete de cada cliente após o contato no direct. O relatório final é calculado com esses dados.</div>
+        <div class="page-title">Pós-venda</div>
+        <div class="page-sub">Gerencie entregas, frete e pagamento de cada cliente. Pedidos cancelados são excluídos do faturamento.</div>
       </div>
       <div class="stats">
         <div class="stat"><div class="stat-label">Clientes</div><div class="stat-value accent" id="pl-cli">0</div></div>
@@ -453,6 +454,18 @@ pedro - 2x calça jeans G
               <th style="width:10%;">Valor final</th><th style="width:7%;">Status</th>
             </tr></thead>
             <tbody id="rel-cli-body"><tr><td colspan="7" class="empty">Sem dados.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="color:var(--red);">❌ Pedidos cancelados</div>
+        <div style="overflow-x:auto;" id="rel-cancelados-wrap">
+          <table>
+            <thead><tr>
+              <th style="width:5%;">#</th><th style="width:20%;">Cliente</th>
+              <th style="width:30%;">Produtos</th><th style="width:15%;">Valor</th><th style="width:15%;">Data</th>
+            </tr></thead>
+            <tbody id="rel-cancelados-body"><tr><td colspan="5" class="empty">Nenhum pedido cancelado.</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -722,6 +735,7 @@ function processarComentarios(){
   const ignorar=/\?|quanto custa|qual o pre|tem disponível|tem disponivel|linda|amei|adorei|oi |olá|obrigad|parabens|parabéns/i;
 
   let novas=0;
+  const alertasRodada=[];
   const logHTML=linhas.map(linha=>{
     // extrai cliente
     let cliente='Desconhecido';
@@ -785,11 +799,11 @@ function processarComentarios(){
       const estoqueAntes = prodVinculado.estoque||0;
       prodVinculado.estoque = Math.max(0, estoqueAntes - qtd);
       const estoqueRestante = prodVinculado.estoque;
-      // Só dispara alerta se ESTE pedido causou a mudança crítica
+      // Coleta alertas — dispara só no final do processamento
       if(estoqueAntes > 0 && estoqueRestante === 0){
-        setTimeout(()=>alertaEstoqueUrgente(prodVinculado.nome,'zerado'),300);
+        alertasRodada.push({nome: prodVinculado.nome, tipo: 'zerado'});
       } else if(estoqueAntes > 1 && estoqueRestante === 1){
-        setTimeout(()=>alertaEstoqueUrgente(prodVinculado.nome,'ultimo'),300);
+        alertasRodada.push({nome: prodVinculado.nome, tipo: 'ultimo'});
       }
     }
     novas++;
@@ -818,6 +832,10 @@ function processarComentarios(){
   document.getElementById('comentarios').value='';
   document.getElementById('log-area').innerHTML=`<div class="card"><div class="card-title">Resultado <span class="card-title-right" style="color:var(--green);">${novas} venda${novas!==1?'s':''} registrada${novas!==1?'s':''}</span></div>${logHTML}</div>`;
   toast(novas+' venda'+(novas!==1?'s':'')+' registrada'+(novas!==1?'s':'')+'!');
+  if(alertasRodada.length){
+    const unicos=alertasRodada.filter((a,i,arr)=>arr.findIndex(x=>x.nome===a.nome&&x.tipo===a.tipo)===i);
+    unicos.forEach((a,i)=>{ setTimeout(()=>alertaEstoqueUrgente(a.nome,a.tipo),(i+1)*800); });
+  }
 
   btn.disabled=false;
   document.getElementById('processando').style.display='none';
@@ -860,9 +878,10 @@ function renderPosLive(){
     const f=fretes[k]||{};
     const fv=parseFloat(f.frete)||0;
     const total=c.totalProd+fv;
+    const isCancelado = f.status === 'Cancelado';
     const ini=c.cliente.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
     const statusPill=f.status?statusPillHTML(f.status):'<span class="pill pill-sep">Em separação</span>';
-    return `<div class="cliente-card" id="cc-${k.replace(/\s/g,'_')}">
+    return `<div class="cliente-card" id="cc-${k.replace(/\s/g,'_')}" style="${isCancelado?'opacity:0.5;':''}">
       <div class="cliente-card-header" onclick="toggleCliente('${k.replace(/\s/g,'_')}')">
         <div class="cliente-avatar">${ini}</div>
         <div class="cliente-info">
@@ -891,6 +910,7 @@ function renderPosLive(){
               <option value="Frete informado" ${f.status==='Frete informado'?'selected':''}>Frete informado</option>
               <option value="Pago" ${f.status==='Pago'?'selected':''}>Pago</option>
               <option value="Enviado" ${f.status==='Enviado'?'selected':''}>Enviado</option>
+              <option value="Cancelado" ${f.status==='Cancelado'?'selected':''} style="color:#ff6b6b;">❌ Cancelado</option>
             </select>
           </div>
         </div>
@@ -930,7 +950,7 @@ function renderPosLive(){
 }
 
 function statusPillHTML(s){
-  const map={'Em separação':'pill-sep','Frete informado':'pill-frete','Pago':'pill-pago','Enviado':'pill-enviado'};
+  const map={'Em separação':'pill-sep','Frete informado':'pill-frete','Pago':'pill-pago','Enviado':'pill-enviado','Cancelado':'pill-cancelado'};
   return `<span class="pill ${map[s]||'pill-sep'}">${s}</span>`;
 }
 
@@ -1056,7 +1076,12 @@ function renderRelatorio(){
   const totalFrete=clientes.reduce((s,c)=>{ const f=fretes[c.cliente.toLowerCase()]; return s+(f&&f.frete?parseFloat(f.frete):0); },0);
   const brutoSemDesc=vendas.reduce((s,v)=>s+(v.subtotal||0),0)+totalFrete;
   // Faturamento líquido considera valorFinal (com descontos e taxas) quando disponível
-  const bruto=clientes.length?clientes.reduce((s,c)=>{
+  // Exclui clientes com todos os pedidos cancelados do faturamento
+  const clientesAtivos=clientes.filter(c=>{
+    const f=fretes[c.cliente.toLowerCase()]||{};
+    return f.status !== 'Cancelado';
+  });
+  const bruto=clientesAtivos.length?clientesAtivos.reduce((s,c)=>{
     const f=fretes[c.cliente.toLowerCase()]||{};
     const fv=parseFloat(f.frete)||0;
     return s+(f.valorFinal!=null?f.valorFinal:c.totalProd+fv);
@@ -1071,7 +1096,26 @@ function renderRelatorio(){
   document.getElementById('fin-liquido-real').className='fin-value '+(bruto>=brutoSemDesc*0.5?'green':'red');
   document.getElementById('fin-pedidos').textContent=clientes.length;
   document.getElementById('fin-frete').textContent=fmt(totalFrete);
-  document.getElementById('fin-ticket').textContent=clientes.length?fmt(bruto/clientes.length):'R$ 0,00';
+  document.getElementById('fin-ticket').textContent=clientesAtivos.length?fmt(bruto/clientesAtivos.length):'R$ 0,00';
+
+  // Pedidos cancelados
+  const cancelados = clientes.filter(c=>{ const f=fretes[c.cliente.toLowerCase()]||{}; return f.status==='Cancelado'; });
+  const relCancBody = document.getElementById('rel-cancelados-body');
+  if(relCancBody){
+    if(!cancelados.length){ relCancBody.innerHTML='<tr><td colspan="5" class="empty">Nenhum pedido cancelado.</td></tr>'; }
+    else{
+      relCancBody.innerHTML = cancelados.map((c,i)=>{
+        const itens = c.itens.map(v=>`${v.produto} ×${v.qtd}`).join(', ');
+        const f = fretes[c.cliente.toLowerCase()]||{};
+        return `<tr style="opacity:0.7;">
+          <td>${i+1}</td><td style="color:var(--red);">${c.cliente}</td>
+          <td style="font-size:11px;">${itens}</td>
+          <td style="text-decoration:line-through;color:var(--muted);">${fmt(c.totalProd)}</td>
+          <td style="font-size:11px;color:var(--muted);">${f.dataCancelamento||'—'}</td>
+        </tr>`;
+      }).join('');
+    }
+  }
 
   // por produto
   const mapa={};
@@ -1125,7 +1169,12 @@ function copiarRelatorio(){
   const totalFrete=clientes.reduce((s,c)=>{ const f=fretes[c.cliente.toLowerCase()]; return s+(f&&f.frete?parseFloat(f.frete):0); },0);
   const brutoSemDesc=vendas.reduce((s,v)=>s+(v.subtotal||0),0)+totalFrete;
   // Faturamento líquido considera valorFinal (com descontos e taxas) quando disponível
-  const bruto=clientes.length?clientes.reduce((s,c)=>{
+  // Exclui clientes com todos os pedidos cancelados do faturamento
+  const clientesAtivos=clientes.filter(c=>{
+    const f=fretes[c.cliente.toLowerCase()]||{};
+    return f.status !== 'Cancelado';
+  });
+  const bruto=clientesAtivos.length?clientesAtivos.reduce((s,c)=>{
     const f=fretes[c.cliente.toLowerCase()]||{};
     const fv=parseFloat(f.frete)||0;
     return s+(f.valorFinal!=null?f.valorFinal:c.totalProd+fv);
