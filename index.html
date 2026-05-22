@@ -782,10 +782,15 @@ function processarComentarios(){
 
     vendas.push({cliente,idproduto,produto:nomeProd,qtd,valorVenda,subtotal,status:'Em separação',dataPedido:new Date().toISOString().split('T')[0],obs:''});
     if(prodVinculado){
-      prodVinculado.estoque = Math.max(0,(prodVinculado.estoque||0)-qtd);
+      const estoqueAntes = prodVinculado.estoque||0;
+      prodVinculado.estoque = Math.max(0, estoqueAntes - qtd);
       const estoqueRestante = prodVinculado.estoque;
-      if(estoqueRestante === 0) setTimeout(()=>alertaEstoqueUrgente(prodVinculado.nome,'zerado'),300);
-      else if(estoqueRestante === 1) setTimeout(()=>alertaEstoqueUrgente(prodVinculado.nome,'ultimo'),300);
+      // Só dispara alerta se ESTE pedido causou a mudança crítica
+      if(estoqueAntes > 0 && estoqueRestante === 0){
+        setTimeout(()=>alertaEstoqueUrgente(prodVinculado.nome,'zerado'),300);
+      } else if(estoqueAntes > 1 && estoqueRestante === 1){
+        setTimeout(()=>alertaEstoqueUrgente(prodVinculado.nome,'ultimo'),300);
+      }
     }
     novas++;
 
