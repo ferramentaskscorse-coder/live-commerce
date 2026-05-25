@@ -520,13 +520,18 @@ function carregar(){
   try{ const d=JSON.parse(localStorage.getItem(CHAVE)||'{}'); produtos=d.produtos||[]; vendas=d.vendas||[]; fretes=d.fretes||{}; }
   catch(e){ produtos=[];vendas=[];fretes={}; }
 
-  // Preenche data de cadastro para produtos sem data (cadastrados antes dessa versão)
+  // Preenche data de cadastro para produtos sem data
   const ontem = new Date();
   ontem.setDate(ontem.getDate() - 1);
   const ontemStr = ontem.toLocaleDateString('pt-BR');
   let atualizado = false;
   produtos.forEach(p => {
     if(!p.dataCadastro){ p.dataCadastro = ontemStr; atualizado = true; }
+    // Migra: garante que estoqueInicial existe
+    if(p.estoqueInicial === undefined){
+      p.estoqueInicial = p.estoque || 0;
+      atualizado = true;
+    }
   });
   if(atualizado) salvar();
 }
@@ -554,6 +559,14 @@ function getClientes(){
     mapa[k].totalProd+=(v.subtotal||0);
   });
   return Object.values(mapa);
+}
+
+function getEstoqueAtual(prod){
+  // Estoque atual = inicial - vendas ativas deste produto
+  const vendido = getVendasAtivas()
+    .filter(v => v.idproduto === prod.id)
+    .reduce((s, v) => s + (v.qtd||0), 0);
+  return Math.max(0, (prod.estoqueInicial !== undefined ? prod.estoqueInicial : prod.estoque||0) - vendido);
 }
 
 function getVendasAtivas(){
@@ -609,7 +622,8 @@ function addProduto(){
   const n=x=>parseFloat(document.getElementById(x).value)||0;
   const ativo=document.getElementById('p-ativo').value==='1';
   const dataCadastro = new Date().toLocaleDateString('pt-BR');
-  produtos.push({id,nome,cor,tam,estoque:n('p-estoque'),custo:n('p-custo'),venda:n('p-venda'),embalagem:n('p-embalagem'),ativo,dataCadastro});
+  const estoqueVal = n('p-estoque');
+  produtos.push({id,nome,cor,tam,estoque:estoqueVal,estoqueInicial:estoqueVal,custo:n('p-custo'),venda:n('p-venda'),embalagem:n('p-embalagem'),ativo,dataCadastro});
   salvar(); renderProdutos(); updateStats(); limparFormProduto(); toast('Produto adicionado!');
 }
 function removeProduto(id){ produtos=produtos.filter(p=>p.id!==id); salvar(); renderProdutos(); updateStats(); }
@@ -710,7 +724,7 @@ function processarLinhas(rows,result){
     const n=v=>{ if(!map[v])return 0; const x=parseFloat(String(row[map[v]]||'0').replace(',','.')); return isNaN(x)?0:x; };
     const corVal=map['cor']?String(row[map['cor']]||'').trim():'';
     const tamVal=map['tam']?String(row[map['tam']]||'').trim():'';
-    produtos.push({id,nome,cor:corVal,tam:tamVal,estoque:n('estoque'),custo:n('custo'),venda:n('venda'),embalagem:n('embalagem'),ativo:true,dataCadastro:new Date().toLocaleDateString('pt-BR')});
+    produtos.push({id,nome,cor:corVal,tam:tamVal,estoque:n('estoque'),custo:n('custo'),venda:n('venda'),embalagem:n('embalagem'),ativo:true,estoqueInicial:parseInt(row[mapaIdx.estoque])||0,dataCadastro:new Date().toLocaleDateString('pt-BR')});
     ok++;
   });
   salvar(); renderProdutos(); updateStats();
@@ -827,11 +841,10 @@ function processarComentarios(){
     const idPedido = 'PED-' + Date.now() + '-' + Math.random().toString(36).substr(2,4).toUpperCase();
     vendas.push({idPedido,cliente,idproduto,produto:nomeProd,cor:corComent,tam:tamComent,qtd,valorVenda,subtotal,status:'Em separação',dataPedido:new Date().toISOString().split('T')[0],obs:''});
     if(prodVinculado){
-      const estoqueAntes = prodVinculado.estoque||0;
-      prodVinculado.estoque = Math.max(0, estoqueAntes - qtd);
-      const estoqueRestante = prodVinculado.estoque;
-      // Coleta alertas — dispara só no final do processamento
-      if(estoqueAntes > 0 && estoqueRestante === 0){
+      // Alerta baseado em estoque calculado (não desconta mais do produto)
+      const estoqueAntes = getEstoqueAtual(prodVinculado);
+      const estoqueRestante = estoqueAntes - qtd;
+      if(estoqueAntes > 0 && estoqueRestante <= 0){
         alertasRodadaExt.push({nome: prodVinculado.nome, tipo: 'zerado'});
       } else if(estoqueAntes > 1 && estoqueRestante === 1){
         alertasRodadaExt.push({nome: prodVinculado.nome, tipo: 'ultimo'});
@@ -890,15 +903,9 @@ function extrairProduto(linha){
 
 // VENDAS
 function removeVenda(idx){
-  const v = vendas[idx];
-  // Devolve estoque ao remover venda
-  if(v && v.idproduto){
-    const prod = produtos.find(p=>p.id===v.idproduto);
-    if(prod) prod.estoque = (prod.estoque||0) + v.qtd;
-  }
   vendas.splice(idx,1);
   salvar(); renderVendas(); renderEstoque(); updateStats();
-  toast('Venda removida e estoque devolvido.');
+  toast('Venda removida!');
 }
 function renderVendas(){
   // Sincroniza status das vendas com pós-venda por cliente
@@ -1118,10 +1125,7 @@ function removerItemPedido(k, itemIdx){
   if(!cliente) return;
   const item = cliente.itens[itemIdx];
   if(!item) return;
-  // Devolve estoque
-  const prod = produtos.find(p=>p.id===item.idproduto);
-  if(prod) prod.estoque = (prod.estoque||0) + item.qtd;
-  // Remove da lista de vendas pelo idPedido
+  // Remove da lista de vendas pelo idPedido (estoque recalculado automaticamente)
   const idxVenda = vendas.findIndex(v=>v.idPedido===item.idPedido);
   if(idxVenda>-1) vendas.splice(idxVenda,1);
   salvar(); updateStats(); renderPosLive(); renderVendas();
@@ -1135,31 +1139,13 @@ function salvarFrete(k,campo,valor){
   const statusAnterior = fretes[k].status || 'Em separação';
   if(campo==='status'){
     if(valor==='Cancelado' && statusAnterior!=='Cancelado'){
-      // Cancelando — devolve estoque
+      // Cancelando — estoque é recalculado automaticamente
       fretes[k].dataCancelamento = new Date().toLocaleDateString('pt-BR');
-      const clienteCanc = getClientes().find(c=>c.cliente.toLowerCase()===k);
-      console.log('CANCELANDO:', k, '| cliente encontrado:', !!clienteCanc, '| itens:', clienteCanc?.itens?.length);
-      if(clienteCanc){
-        clienteCanc.itens.forEach(v=>{
-          const prod = produtos.find(p=>p.id===v.idproduto);
-          console.log('Item:', v.produto, '| prod encontrado:', !!prod, '| qtd:', v.qtd);
-          if(prod){
-            prod.estoque = (prod.estoque||0) + v.qtd;
-            console.log('Estoque devolvido:', prod.nome, '->', prod.estoque);
-          }
-        });
-        salvar(); renderProdutos(); renderEstoque(); updateStats();
-      }
+      salvar(); renderEstoque(); updateStats();
     } else if(valor!=='Cancelado' && statusAnterior==='Cancelado'){
-      // Reativando — desconta estoque novamente
+      // Reativando — estoque é recalculado automaticamente
       fretes[k].dataCancelamento = null;
-      const clienteReativ = getClientes().find(c=>c.cliente.toLowerCase()===k);
-      if(clienteReativ){
-        clienteReativ.itens.forEach(v=>{
-          const prod = produtos.find(p=>p.id===v.idproduto);
-          if(prod) prod.estoque = Math.max(0,(prod.estoque||0) - v.qtd);
-        });
-      }
+      salvar(); renderEstoque(); updateStats();
     }
   }
   salvar(); updateStats();
@@ -1678,7 +1664,7 @@ function confirmarValidacao(){
     if(!nome || nome.length < 2) return;
     if(produtos.find(x=>x.id===id)){ dup++; return; }
 
-    produtos.push({ id: id||'SEM-ID', nome, cor, tam, estoque, custo, venda, embalagem, ativo: true, dataCadastro: new Date().toLocaleDateString('pt-BR') });
+    produtos.push({ id: id||'SEM-ID', nome, cor, tam, estoque, estoqueInicial: estoque, custo, venda, embalagem, ativo: true, dataCadastro: new Date().toLocaleDateString('pt-BR') });
     ok++;
   });
 
@@ -1966,11 +1952,14 @@ function salvarEdicao(){
   }
 
   const dataOriginal = produtos[idx].dataCadastro || new Date().toLocaleDateString('pt-BR');
+  const novoEstoque = parseFloat(document.getElementById('m-estoque').value)||0;
+  const estoqueInicialOriginal = produtos[idx].estoqueInicial !== undefined ? produtos[idx].estoqueInicial : novoEstoque;
   produtos[idx] = {
     id:        novoId,
     nome:      document.getElementById('m-nome').value.trim(),
     ativo:     document.getElementById('m-ativo').value==='1',
     dataCadastro: dataOriginal,
+    estoqueInicial: estoqueInicialOriginal,
     cor:       document.getElementById('m-cor').value.trim(),
     tam:       document.getElementById('m-tam').value.trim(),
     estoque:   parseFloat(document.getElementById('m-estoque').value)||0,
@@ -2362,7 +2351,7 @@ function renderEstoque(){
   }
 
   tbody.innerHTML = lista.map(p=>{
-    const est = p.estoque||0;
+    const est = getEstoqueAtual(p);
     const vend = vendidosPorId[p.id]||0;
     let situacao, sitColor, sitBg;
     if(est===0){
